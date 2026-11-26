@@ -900,10 +900,216 @@ function limitsPage(w, d, family) {
   else heartbeatLine(w, d, 11, true);
 }
 
+// ---- 日曆：半年熱力圖 ----
+function calendarGrid(cal, weeks, width, gap, showMonths) {
+  const cell = (width - gap * (weeks - 1)) / weeks;
+  const top = showMonths ? 13 : 0;
+  const dc = newImage(width, top + cell * 7 + gap * 6);
+  const today = new Date(cal[cal.length - 1][0] + "T12:00:00");
+  const wd = (today.getDay() + 6) % 7;                   // Monday = 0
+  const start = new Date(today.getTime() - ((weeks - 1) * 7 + wd) * 86400000);
+  const byDate = {};
+  cal.forEach(([day, v]) => { byDate[day] = v; });
+  const nz = cal.map(x => x[1]).filter(v => v > 0).sort((a, b) => a - b);
+  const q = f => nz.length ? nz[Math.min(nz.length - 1, Math.floor(nz.length * f))] : 1;
+  const cuts = [q(0.25), q(0.5), q(0.75)];
+  const alpha = v => v <= 0 ? 0 : v <= cuts[0] ? 0.3 : v <= cuts[1] ? 0.5 : v <= cuts[2] ? 0.75 : 1;
+  dc.setFont(Font.systemFont(9));
+  dc.setTextColor(Color.gray());
+  let lastMonth = -1;
+  for (let col = 0; col < weeks; col++) {
+    for (let row = 0; row < 7; row++) {
+      const t = new Date(start.getTime() + (col * 7 + row) * 86400000);
+      if (t > today) continue;
+      const key = t.getFullYear() + "-" + String(t.getMonth() + 1).padStart(2, "0") + "-" + String(t.getDate()).padStart(2, "0");
+      const a = alpha(byDate[key] || 0);
+      const p = new Path();
+      p.addRoundedRect(new Rect(col * (cell + gap), top + row * (cell + gap), cell, cell), cell * 0.22, cell * 0.22);
+      dc.addPath(p);
+      dc.setFillColor(a ? new Color("#d97757", a) : C.track);
+      dc.fillPath();
+      if (showMonths && row === 0 && t.getMonth() !== lastMonth) {
+        if (col > 0 && col < weeks - 1) dc.drawText((t.getMonth() + 1) + "月", new Point(col * (cell + gap), 0));
+        lastMonth = t.getMonth();
+      }
+    }
+  }
+  return dc.getImage();
+}
+function calendarPage(w, d, family) {
+  if (!d.calendar) return oldData(w, "Claude 日曆", d);
+  const cal = d.calendar;
+  if (family === "small") {
+    header(w, d, "日曆");
+    w.addSpacer(6);
+    const cw = 146;
+    const img = calendarGrid(cal.slice(-84), 12, cw, 2, false);
+    addImg(w, img, cw, img.size.height);
+    w.addSpacer();
+    const r = w.addStack();
+    r.centerAlignContent();
+    label(r, "連續 ", 10, C.dim);
+    label(r, d.streak + " 天", 13, C.actual, "round");
+    label(r, "・最長 " + d.best_streak, 10, C.dim);
+    return;
+  }
+  const cw = contentWidth();
+  const active = cal.filter(x => x[1] > 0).length;
+  header(w, d, "Claude 日曆");
+  w.addSpacer(family === "large" ? 10 : 6);
+  if (family === "large") {
+    tiles(w, [
+      ["目前連續", d.streak + " 天", "今天也有用", C.actual],
+      ["最長連續", (d.best_streak || d.streak) + " 天", "有紀錄以來", C.actual],
+      ["半年用了", active + " 天", "共 " + cal.length + " 天", C.cache],
+    ], cw);
+    w.addSpacer(14);
+  }
+  // Large: 20 weeks so the squares are bigger and easier to read; medium fits half a year.
+  const weeks = family === "large" ? 20 : 26;
+  const img = calendarGrid(cal.slice(-(weeks * 7)), weeks, cw, family === "large" ? 3 : 2, true);
+  addImg(w, img, cw, img.size.height);
+  if (family === "large") w.addSpacer(); else w.addSpacer(4);  // large: legend sits at the bottom
+  if (family === "medium") {
+    label(w, "近半年用了 " + active + " 天・目前連續 " + d.streak + " 天・最長 " + (d.best_streak || d.streak) + " 天", 10, C.dim);
+    w.addSpacer();
+    return;
+  }
+  // Busiest week of the half year.
+  let best = [0, 0];
+  for (let i = 0; i + 7 <= cal.length; i += 7) {
+    const sum = cal.slice(i, i + 7).reduce((a, x) => a + x[1], 0);
+    if (sum > best[0]) best = [sum, i];
+  }
+  const legend = w.addStack();
+  legend.centerAlignContent();
+  label(legend, "最忙的一週：" + md(cal[best[1]][0]) + " 起，實際使用 " + fmt(best[0]), 11, C.text);
+  legend.addSpacer();
+  label(legend, "少 ", 9, C.dim);
+  [0.3, 0.5, 0.75, 1].forEach(a => {
+    const dc = newImage(10, 10);
+    const p = new Path();
+    p.addRoundedRect(new Rect(0, 0, 10, 10), 2.2, 2.2);
+    dc.addPath(p);
+    dc.setFillColor(new Color("#d97757", a));
+    dc.fillPath();
+    addImg(legend, dc.getImage(), 10, 10);
+    legend.addSpacer(2);
+  });
+  label(legend, " 多", 9, C.dim);
+  w.addSpacer();
+}
+
+// ---- 鎖定畫面（iOS 16 以上：圓形、長方形、單行） ----
+// iOS tints lock screen widgets itself, so everything is drawn in white.
+function monoRing(size, pct, center, sub) {
+  const dc = newImage(size, size);
+  const lw = size * 0.12, r = (size - lw) / 2, c = size / 2;
+  const arc = (to, col) => {
+    const p = new Path();
+    const steps = Math.max(2, Math.ceil(to * 60));
+    for (let i = 0; i <= steps; i++) {
+      const a = -Math.PI / 2 + 2 * Math.PI * to * i / steps;
+      const pt = new Point(c + r * Math.cos(a), c + r * Math.sin(a));
+      if (i === 0) p.move(pt); else p.addLine(pt);
+    }
+    dc.addPath(p);
+    dc.setStrokeColor(col);
+    dc.setLineWidth(lw);
+    dc.strokePath();
+  };
+  arc(1, new Color("#ffffff", 0.3));
+  if (pct > 0) arc(Math.min(pct, 100) / 100, Color.white());
+  dc.setTextAlignedCenter();
+  dc.setTextColor(Color.white());
+  dc.setFont(Font.boldRoundedSystemFont(size * 0.28));
+  dc.drawTextInRect(center, new Rect(0, c - size * 0.2, size, size * 0.34));
+  dc.setFont(Font.systemFont(size * 0.13));
+  dc.drawTextInRect(sub, new Rect(0, c + size * 0.1, size, size * 0.2));
+  return dc.getImage();
+}
+function lockPage(w, d, family) {
+  w.setPadding(0, 0, 0, 0);  // iOS draws no widget background on the lock screen
+  const white = Color.white(), soft = new Color("#ffffff", 0.75);
+  const five = mainLimits(d)[0], week = mainLimits(d)[1];
+  const c = counts(d);
+  const p5 = five ? limitPct(five) : null;
+  if (family === "accessoryInline") {
+    const parts = [];
+    if (five) parts.push("5h " + p5 + "%");
+    if (week) parts.push("週 " + limitPct(week) + "%");
+    if (c.waiting) parts.push("等你 " + c.waiting);
+    else if (c.running) parts.push("跑 " + c.running);
+    label(w, "✻ " + (parts.length ? parts.join("・") : fmt(d.today.actual) + " token"), 12, white);
+    return;
+  }
+  if (family === "accessoryCircular") {
+    w.addAccessoryWidgetBackground = true;
+    const r = w.addStack();
+    r.addSpacer();
+    addImg(r, monoRing(56, p5 || 0, p5 === null ? "—" : p5 + "%", c.waiting ? "等你 " + c.waiting : "5 小時"), 56, 56);
+    r.addSpacer();
+    return;
+  }
+  // accessoryRectangular
+  const h = w.addStack();
+  h.centerAlignContent();
+  label(h, "✻ Claude", 12, white, "bold");
+  h.addSpacer();
+  if (c.waiting) label(h, "等你 " + c.waiting, 11, white, "bold");
+  else if (c.running) label(h, "執行中 " + c.running, 11, soft);
+  w.addSpacer(2);
+  if (five) {
+    const r = w.addStack();
+    r.centerAlignContent();
+    label(r, "5 小時 " + p5 + "%", 12, white, "bold");
+    r.addSpacer();
+    if (canTick(five)) liveDate(r, new Date(five.resets), "timer", 11, soft, 46);
+    w.addSpacer(3);
+    const dc = newImage(150, 5);
+    const t = new Path();
+    t.addRoundedRect(new Rect(0, 0, 150, 5), 2.5, 2.5);
+    dc.addPath(t);
+    dc.setFillColor(new Color("#ffffff", 0.3));
+    dc.fillPath();
+    if (p5 > 0) {
+      const f = new Path();
+      f.addRoundedRect(new Rect(0, 0, Math.max(5, 150 * Math.min(p5, 100) / 100), 5), 2.5, 2.5);
+      dc.addPath(f);
+      dc.setFillColor(white);
+      dc.fillPath();
+    }
+    addImg(w, dc.getImage(), 150, 5);
+    w.addSpacer(3);
+  }
+  label(w, (week ? "每週 " + limitPct(week) + "%・" : "") + "今天 " + fmt(d.today.actual), 11, soft);
+}
+
+// A sentence for Siri / Shortcuts: limits with time left, then who is waiting.
+function spokenSummary(d) {
+  if (!d) return "現在讀不到 Claude 的用量資料。";
+  const parts = [];
+  mainLimits(d).forEach(x => {
+    let s = x.label + "用了百分之" + limitPct(x);
+    if (canTick(x)) {
+      const m = Math.round((new Date(x.resets) - Date.now()) / 60000);
+      s += "，" + (m >= 60 ? Math.floor(m / 60) + " 小時 " : "") + (m % 60) + " 分後重置";
+    }
+    parts.push(s);
+  });
+  const c = counts(d);
+  if (c.waiting) parts.push("有 " + c.waiting + " 個 session 在等你回應");
+  if (c.running) parts.push(c.running + " 個 session 在執行");
+  if (!c.waiting && !c.running) parts.push("目前沒有 session 在跑");
+  parts.push("今天用了 " + fmt(d.today.actual) + " token");
+  return "Claude 狀態：" + parts.join("；") + "。";
+}
+
 // ---------- 主程式 ----------
-const PAGES = [["用量", usagePage], ["趣味", funPage], ["更多", morePage], ["狀態", statusPage], ["寵物", petPage], ["額度", limitsPage]];
+const PAGES = [["用量", usagePage], ["趣味", funPage], ["更多", morePage], ["狀態", statusPage], ["寵物", petPage], ["額度", limitsPage], ["日曆", calendarPage]];
 function pickPage(param) {
   const p = String(param || "").replace(/\s+/g, "").toLowerCase();
+  if (p.includes("日曆") || p.includes("calendar")) return calendarPage;
   if (p.includes("額度") || p.includes("limit")) return limitsPage;
   if (p.includes("寵物") || p.includes("小克") || p.includes("pet")) return petPage;
   if (p.includes("狀態") || p.includes("status")) return statusPage;
@@ -964,6 +1170,8 @@ function build(page, data, family) {
     const t = label(w, "iCloud 可能還在同步，稍後會自動重試；也可以點一下小工具重新執行。", 10, C.dim);
     t.lineLimit = 3;
     w.addSpacer();
+  } else if (String(family).startsWith("accessory")) {
+    lockPage(w, data, family);  // lock screen: one design for every parameter
   } else {
     page(w, data, family);
   }
@@ -974,11 +1182,9 @@ const data = await loadData();
 if (config.runsInWidget) {
   Script.setWidget(build(pickPage(args.widgetParameter), data, config.widgetFamily || "large"));
 } else if (!config.runsInApp) {
-  // Run from Shortcuts (an automation): no menu; loading the data above already refreshed the phone's
-  // cached copy. Hand back a one-line summary.
-  const L = data && mainLimits(data);
-  Script.setShortcutOutput(data ? "Claude 用量更新於 " + shortTime(data.generated) +
-    (L && L.length ? "，" + L.map(x => x.label + " " + limitPct(x) + "%").join("、") : "") : "讀不到用量資料");
+  // Run from Shortcuts or Siri: no menu; loading the data above already refreshed the phone's cached copy.
+  // Hand back a sentence Siri can read out.
+  Script.setShortcutOutput(spokenSummary(data));
 } else {
   // Run inside the app: ask which page to preview.
   const a = new Alert();

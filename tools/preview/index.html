@@ -21,7 +21,9 @@
 </style>
 <div class="grid" id="grid"></div>
 <script type="module">
-const SIZES = { small: [169, 169], medium: [360, 169], large: [360, 359] };  // measured on the iPhone (402 pt wide)
+const SIZES = { small: [169, 169], medium: [360, 169], large: [360, 359],
+  // Lock screen (iPhone 402 pt): approximate.
+  accessoryCircular: [72, 72], accessoryRectangular: [172, 76], accessoryInline: [240, 22] };  // measured on the iPhone (402 pt wide)
 const hex = (h, a) => { h = h.replace("#", ""); const n = parseInt(h, 16);
   return `rgba(${n >> 16 & 255},${n >> 8 & 255},${n & 255},${a ?? 1})`; };
 class Color { constructor(h, a) { this.css = hex(h, a); } static dynamic(l) { return l; }
@@ -71,6 +73,7 @@ class WImage { constructor(i) { this.img = i; this.imageSize = i.size; } leftAli
 class WStack { constructor() { this.items = []; this.dir = "h"; this.center = false; this.pad = null; this.spacing = 0; }
   addStack() { const s = new WStack(); this.items.push(s); return s; }
   addText(t) { const x = new WText(String(t)); this.items.push(x); return x; }
+  set addAccessoryWidgetBackground(v) { this._bg = v; } get addAccessoryWidgetBackground() { return this._bg; }
   addDate(d) { const x = new WDate(d); this.items.push(x); return x; }
   addImage(i) { const x = new WImage(i); this.items.push(x); return x; }
   addSpacer(n) { this.items.push({ spacer: n ?? null }); return {}; }
@@ -128,7 +131,8 @@ const blob = URL.createObjectURL(new Blob([src], { type: "text/javascript" }));
 const pages = (new URLSearchParams(location.search).get("pages") || ",趣味,更多,狀態,寵物,額度").split(",");
 // ?only=small|medium|large&shot=1: one widget, no caption (for README images).
 const Q = new URLSearchParams(location.search);
-const fams = Q.get("only") ? [Q.get("only")] : ["small", "medium", "large"];
+const fams = Q.get("only") ? [Q.get("only")] : Q.get("lock") ? ["accessoryCircular", "accessoryRectangular", "accessoryInline"]
+  : ["small", "medium", "large"];
 if (Q.get("shot")) { document.body.style.cssText = "margin:0;padding:12px;background:#e6e3dc;display:inline-block";
   document.getElementById("grid").style.cssText = "display:block"; }
 for (const p of pages) for (const fam of fams) {
@@ -139,8 +143,13 @@ for (const p of pages) for (const fam of fams) {
   const cap = document.createElement("div"); cap.className = "cap"; cap.textContent = (p || "用量") + " · " + fam;
   const el = document.createElement("div"); el.className = "widget"; el.style.width = W + "px"; el.style.height = H + "px";
   el.style.background = (w.backgroundColor || new Color("#fff")).css;
+  if (fam.startsWith("accessory")) {  // lock screen look: wallpaper behind, white content
+    el.style.background = "#3a3f4b"; el.style.borderRadius = fam === "accessoryCircular" ? "50%" : "10px";
+    if (w.addAccessoryWidgetBackground) el.style.background = "#5a5f6b";
+  }
   const inner = document.createElement("div"); inner.style.cssText = "width:100%;height:100%;box-sizing:border-box;display:flex;flex-direction:column";
   render(w, inner, true); inner.style.padding = (w.pad || [16, 16, 16, 16]).map(x => x + "px").join(" ");
+  if (fam.startsWith("accessory")) inner.style.background = "transparent";
   el.appendChild(inner); cell.append(cap, el); document.getElementById("grid").appendChild(cell);
   if (Q.get("shot")) cap.style.display = "none";
   shrink(inner);

@@ -322,7 +322,19 @@ if os.path.isdir(widget_dir):
     while d(streak) in active:
         streak += 1
     busiest = max(daily, key=lambda x: x["actual"])
+    # Half a year of daily actual use for the calendar heat map (the CSV ledger keeps days whose
+    # transcripts are gone), plus the longest run of active days ever recorded.
+    per_day = defaultdict(int)
+    for (day, _, _), r in rows.items():
+        per_day[day] += r[0] + r[1]
+    calendar = [[d(n), per_day.get(d(n), 0)] for n in range(181, -1, -1)]
+    best, run, prev = 0, 0, None
+    for day in sorted(k for k, v in per_day.items() if v):
+        cur = datetime.date.fromisoformat(day)
+        run = run + 1 if prev and (cur - prev).days == 1 else 1
+        best, prev = max(best, run), cur
     summary.update({
+        "calendar": calendar, "best_streak": best,
         "streak": streak, "active_days": sum(1 for x in daily if x["actual"] or x["cache"]),
         "busiest": busiest, "hours": hours, "weekdays": weekdays,
         "projects": sorted(([k, *v] for k, v in projects.items()), key=lambda x: -x[1])[:5],

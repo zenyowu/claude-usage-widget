@@ -32,7 +32,7 @@ Claude 會：檢查環境 → 問你兩個選項（插電時是否保持清醒�
 
 ## 會看到什麼
 
-小工具有六頁，用「參數」選頁（長按小工具 → 編輯小工具 → Parameter）。每頁都有小、中、大三種尺寸。
+小工具有七頁，用「參數」選頁（長按小工具 → 編輯小工具 → Parameter）。每頁都有小、中、大三種尺寸。
 
 | 參數 | 頁面 | 內容 |
 | --- | --- | --- |
@@ -42,8 +42,11 @@ Claude 會：檢查環境 → 問你兩個選項（插電時是否保持清醒�
 | 狀態 | 工作狀態 | 哪些 session 在執行、等你回答、有新回覆；心跳與額度 |
 | 寵物 | 小克 | 一隻跟著 session 狀態換表情的小寵物；體力＝5 小時額度、飽足＝今天用量、天線＝Remote Control |
 | 額度 | 方案額度 | 圓環儀表、即時倒數到重置、照目前速度重置前會用到多少 |
+| 日曆 | 使用日曆 | 半年熱力圖（像 GitHub 的貢獻圖）、目前與最長連續天數、最忙的一週 |
 
-以下是 6 頁 × 3 種尺寸的模擬圖（示範資料，非真實帳號）。實機字型寬度會略有不同。
+另外還有**鎖定畫面小工具**（圓形、長方形、單行）與 **Siri 語音摘要**，見下方。
+
+以下是 7 頁 × 3 種尺寸的模擬圖（示範資料，非真實帳號）。實機字型寬度會略有不同。
 
 ### 用量（參數留空）
 
@@ -82,6 +85,29 @@ Claude 會：檢查環境 → 問你兩個選項（插電時是否保持清醒�
 | 小 | 中 | 大 |
 | :-: | :-: | :-: |
 | <img src="docs/images/widgets/6-limits-small.png" width="170" alt="額度・小"> | <img src="docs/images/widgets/6-limits-medium.png" width="340" alt="額度・中"> | <img src="docs/images/widgets/6-limits-large.png" width="340" alt="額度・大"> |
+
+### 日曆
+
+| 小 | 中 | 大 |
+| :-: | :-: | :-: |
+| <img src="docs/images/widgets/7-calendar-small.png" width="170" alt="日曆・小"> | <img src="docs/images/widgets/7-calendar-medium.png" width="340" alt="日曆・中"> | <img src="docs/images/widgets/7-calendar-large.png" width="340" alt="日曆・大"> |
+
+### 鎖定畫面
+
+| 圓形 | 長方形 | 單行（時間上方） |
+| :-: | :-: | :-: |
+| <img src="docs/images/widgets/8-lock-circular.png" width="88" alt="鎖定畫面・圓形"> | <img src="docs/images/widgets/8-lock-rectangular.png" width="188" alt="鎖定畫面・長方形"> | <img src="docs/images/widgets/8-lock-inline.png" width="256" alt="鎖定畫面・單行"> |
+
+圓形是 5 小時額度圓環（有 session 等你回應時下方會寫「等你 N」）；長方形多了即時倒數與每週額度；單行是一句話摘要。
+iOS 會依鎖定畫面配色自動上色，所以實際顏色跟著你的桌布。加法：長按鎖定畫面 → 自訂 → 鎖定畫面 → 點小工具區 → Scriptable →
+選樣式 → 點它選「Claude Token 用量」。鎖定畫面不分頁面，參數可以留空。
+
+### Siri 語音摘要
+
+「捷徑」App 新增捷徑：動作加 Scriptable 的「Run Script」選「Claude Token 用量」，再加「朗讀文字」（或「顯示結果」），
+捷徑取名「Claude 狀態」。之後說「嘿 Siri，Claude 狀態」就會念出：
+
+> Claude 狀態：5 小時用了百分之42，1 小時 21 分後重置；每週用了百分之31；有 1 個 session 在等你回應；1 個 session 在執行；今天用了 169萬 token。
 
 「幾分鐘前」與重置倒數由 iOS 即時跳動；其他數字在小工具刷新時更新（Mac 每 5 分鐘產生一次資料，
 iOS 自己決定多久刷新小工具，通常 5–30 分鐘）。用量、趣味、更多頁點一下會打開 Scriptable 立刻重抓；
@@ -138,7 +164,7 @@ launchctl kickstart -k gui/$(id -u)/claude-usage-widget.export
 
 ## 修改
 
-- 版面都在 `ios/Claude Token 用量.js`，每一頁是一個函式：`usagePage`、`funPage`、`morePage`、`statusPage`、`petPage`、`limitsPage`。
+- 版面都在 `ios/Claude Token 用量.js`，每一頁是一個函式：`usagePage`、`funPage`、`morePage`、`statusPage`、`petPage`、`limitsPage`、`calendarPage`，鎖定畫面是 `lockPage`。
   大尺寸用 `BIG` 與 `S(小, 大)` 切換字級；`contentWidth()` 依 iPhone 寬度算內容寬（內容超過實際寬度時，iOS 會把整列字縮小）。
 - 資料欄位在 Mac 的 `export_usage.py` 最後組成 `summary`；加欄位後小工具才讀得到。
 - 預覽：不用 iPhone 也能看版面。
@@ -148,7 +174,7 @@ launchctl kickstart -k gui/$(id -u)/claude-usage-widget.export
   cd tools/preview && python3 -m http.server 8765
   ```
 
-  用瀏覽器開 `http://127.0.0.1:8765/?data=sample.json`（示範資料），一次看 6 頁 × 3 尺寸；
+  用瀏覽器開 `http://127.0.0.1:8765/?data=sample.json`（示範資料），一次看 7 頁 × 3 尺寸（加 `&lock=1` 看鎖定畫面）；
   `&pages=狀態,寵物` 只看指定頁；`&pages=寵物&only=large&shot=1` 只畫一個小工具（README 的圖就是這樣截的）。想看自己的資料，把 iCloud 的 `claude-usage.json` 複製到 `tools/preview/`，網址拿掉 `?data=sample.json`。
   超出邊框的會標紅框。預覽器的尺寸是在 402pt 寬的 iPhone 量的（中、大 360pt 寬，大尺寸 359pt 高），
   實機字寬會略有差異，最後以手機為準。
