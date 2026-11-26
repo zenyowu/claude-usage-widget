@@ -112,13 +112,14 @@ function canTick(x) {
   const ms = new Date(x.resets) - Date.now();
   return ms > 0 && ms < 86400000;
 }
+// Plain text, worked out when the widget is drawn. (A live relative date follows the phone's region
+// format and came out as 「20 min, 44 sec前」.)
 function ageLabel(stack, d, size) {
   const gen = new Date(d.generated);
-  const mins = (Date.now() - gen.getTime()) / 60000;
+  const mins = Math.max(0, Math.round((Date.now() - gen.getTime()) / 60000));
   const color = mins > 90 ? C.warn : C.dim;
-  if (mins >= 1440) return label(stack, shortTime(d.generated), size, color);
-  liveDate(stack, gen, "relative", size, color, size * 5.6);
-  label(stack, "前", size, color);
+  const text = mins < 1 ? "剛剛" : mins < 60 ? mins + " 分鐘前" : mins < 1440 ? Math.floor(mins / 60) + " 小時前" : shortTime(d.generated);
+  label(stack, text, size, color);
 }
 
 function card(parent, width, pad) {
@@ -328,7 +329,10 @@ function limitRow(w, x, width) {
 function heartbeat(d) {
   const h = d.heartbeat;
   if (!h) return { ok: false, known: false, short: "沒有心跳資料", text: "還沒有心跳資料" };
-  const age = (Date.now() - new Date(h.beat).getTime()) / 60000;
+  // Judge the heartbeat against the moment the Mac wrote this data, not the phone's clock: when the phone
+  // shows an old copy (iOS refreshed late, iCloud slow), that is stale data, not a stopped heartbeat.
+  // How old the data itself is shows in the header (orange after 90 minutes).
+  const age = (new Date(d.generated).getTime() - new Date(h.beat).getTime()) / 60000;
   const problems = [];
   if (age > 6) problems.push("心跳停了 " + Math.round(age) + " 分鐘（Mac 可能睡著）");
   if (!h.app_running) problems.push(h.paused ? "Claude 沒開（已暫停自動重開）" : "Claude 沒開");
