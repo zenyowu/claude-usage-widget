@@ -1,5 +1,25 @@
 # 更新紀錄
 
+## 2026.11.27
+
+依 [Scriptable 官方文件](https://scriptable.app/docs/)（已從 docs.scriptable.app 搬到 scriptable.app/docs）加入九項功能：
+
+1. **通知**：額度重置那一刻推播（`setTriggerDate` 事先排定、同一 identifier 重排不重複）；5 小時額度超過門檻推播（每區段一次）；
+   有 session 等你回應時推播並附「打開 session」按鈕（每個 session 的每一回合一次）。
+2. **透明背景**：`backgroundStyle = "transparent"`（iOS／iPadOS 27.2 以上），卡片改半透明。
+3. **SF Symbols**：標題、心跳、session 狀態改用 Apple 圖示（找不到圖示時退回文字）。
+4. **語音**：從 Siri 執行時 `Speech.speak` 直接念出狀態。
+5. **新版檢查與一鍵更新**：每 12 小時讀 GitHub 的 `VERSION`；有新版時小工具提示，設定頁可下載新版取代腳本（會檢查內容）。
+6. **設定頁**：在 App 裡執行腳本改為 `UITable` 設定頁，設定存在 iCloud，小工具與 App 共用。
+7. **主題**：預設、暖橘漸層、夜空（`LinearGradient`）。
+8. **提醒事項與行事曆**：每週額度超過門檻建提醒事項；每週重置時間寫進行事曆（預設關）。
+9. **iPad 特大尺寸**：`extraLarge`、`extraLargePortrait` 使用大尺寸版面。
+
+修正：鎖定畫面小工具不再被設定成首頁的背景色（官方文件：鎖定畫面預設透明）。
+
+驗證：以模擬 Scriptable 物件實跑三種情境——小工具（排定兩則重置通知與一則等待通知）、App 設定頁（列出全部選項、切換主題與通知並存檔）、
+Siri（輸出並朗讀摘要）；高用量資料會多一則門檻通知。主題以預覽器出圖。尚未在 iPhone 實機確認通知、權限詢問、透明背景與一鍵更新。
+
 ## 2026-11-27
 
 ### 修正

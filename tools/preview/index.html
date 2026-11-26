@@ -83,7 +83,16 @@ class WStack { constructor() { this.items = []; this.dir = "h"; this.center = fa
 class ListWidget extends WStack { constructor() { super(); this.dir = "v"; this.pad = [16, 16, 16, 16]; } presentLarge() {} presentMedium() {} presentSmall() {} }
 class DateFormatter { string(d) { const p = n => String(n).padStart(2, "0");
   return (this.dateFormat || "").replace("M/d", (d.getMonth() + 1) + "/" + d.getDate()).replace("HH", p(d.getHours())).replace("mm", p(d.getMinutes())); } }
-Object.assign(window, { Color, Font, Size, Point, Rect, Path, DrawContext, ListWidget, DateFormatter });
+// SF Symbols: a small tinted placeholder (the real glyphs exist only on iOS).
+class SFSymbol { static named(n) { const s = new SFSymbol(); s.n = n; return s; } applyFont(f) { this.f = f; }
+  get image() { const dc = new DrawContext(); dc.size = new Size(14, 14); dc.c.fillStyle = "#000"; dc.c.beginPath();
+    dc.c.arc(7, 7, 5.5, 0, 7); dc.c.fill(); return Object.assign(dc.getImage(), { mask: true }); } }
+class LinearGradient { constructor() { this.colors = []; this.locations = []; } }
+const Notification = class { schedule() { return Promise.resolve(); } setTriggerDate() {} addAction() {}
+  static removePending() { return Promise.resolve(); } };
+const Request = class { constructor(u) { this.url = u; } loadString() { return Promise.reject(new Error("offline preview")); } };
+Object.assign(window, { Color, Font, Size, Point, Rect, Path, DrawContext, ListWidget, DateFormatter, SFSymbol, LinearGradient,
+  Notification, Request, Speech: { speak() {} }, module: { filename: "/d/w.js" } });
 
 function render(st, el, isRoot) {
   el.className = (el.className ? el.className + " " : "") + "stack " + (st.dir === "v" ? "v" : "h") + (st.center ? " center" : "");
@@ -105,6 +114,9 @@ function render(st, el, isRoot) {
       if (it.align === "right") { c.style.flex = "1"; }
       if (it.lineLimit !== 1) { c.classList.add("wrap"); if (it.lineLimit) c.style.webkitLineClamp = it.lineLimit; }
       c.dataset.min = it.minimumScaleFactor; el.appendChild(c); }
+    else if (it instanceof WImage && it.img.mask) { const c = document.createElement("div");
+      c.style.cssText = `width:${it.imageSize.width}px;height:${it.imageSize.height}px;flex-shrink:0;border-radius:50%;transform:scale(.8);background:${(it.tintColor || new Color("#000")).css}`;
+      el.appendChild(c); }
     else if (it instanceof WImage) { const c = document.createElement("img"); c.src = it.img.src;
       c.style.width = it.imageSize.width + "px"; c.style.height = it.imageSize.height + "px"; el.appendChild(c); }
     else { const c = document.createElement("div"); if (it.spacer === null) c.className = "flex";
@@ -123,7 +135,10 @@ function shrink(root) {
 const src = await (await fetch("w.js?" + Date.now())).text();
 const data = await (await fetch(new URLSearchParams(location.search).get("data") || "claude-usage.json")).text();
 window.FileManager = { iCloud: () => ({ documentsDirectory: () => "/d", joinPath: (a, b) => a + "/" + b, fileExists: () => true,
-    downloadFileFromiCloud: async () => {}, readString: () => data }),
+    downloadFileFromiCloud: async () => {},
+    // &theme=night|warm&transparent=1 previews the settings; anything else reads the usage data.
+    readString: p => p.endsWith("settings.json") ? JSON.stringify({ theme: new URLSearchParams(location.search).get("theme") || "default",
+      transparent: !!new URLSearchParams(location.search).get("transparent") }) : p.endsWith("state.json") ? "{}" : data }),
   local: () => ({ cacheDirectory: () => "/c", joinPath: (a, b) => a + "/" + b, fileExists: () => false, readString: () => null, writeString() {} }) };
 window.Device = { screenSize: () => new Size(402, 874) };
 window.Script = { setWidget(w) { window.__w = w; }, complete() {} };
@@ -143,6 +158,9 @@ for (const p of pages) for (const fam of fams) {
   const cap = document.createElement("div"); cap.className = "cap"; cap.textContent = (p || "用量") + " · " + fam;
   const el = document.createElement("div"); el.className = "widget"; el.style.width = W + "px"; el.style.height = H + "px";
   el.style.background = (w.backgroundColor || new Color("#fff")).css;
+  if (w.backgroundGradient && w.backgroundGradient.colors.length) el.style.background =
+    `linear-gradient(${w.backgroundGradient.colors.map(c => c.css).join(",")})`;
+  if (w.backgroundStyle === "transparent") el.style.background = "linear-gradient(135deg,#8a7a6a,#4a5560)";
   if (fam.startsWith("accessory")) {  // lock screen look: wallpaper behind, white content
     el.style.background = "#3a3f4b"; el.style.borderRadius = fam === "accessoryCircular" ? "50%" : "10px";
     if (w.addAccessoryWidgetBackground) el.style.background = "#5a5f6b";

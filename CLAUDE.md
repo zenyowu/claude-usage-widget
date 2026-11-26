@@ -87,6 +87,11 @@ launchctl kickstart -k gui/$(id -u)/claude-usage-widget.export
 | 「狀態」「寵物」頁是空的 | 只用終端機 CLI、沒用 Claude Desktop 時正常 |
 | 要移除 | `bash uninstall.sh`，再請使用者在 iPhone 刪掉小工具與腳本 |
 
+## 發布新版時（維護者）
+
+改了 `ios/Claude Token 用量.js` 就要同時把腳本裡的 `const VERSION` 與 repo 根目錄的 `VERSION` 改成同一個新版本號
+（`YYYY.M.D`，同一天第二版起加 `.1`、`.2`），否則使用者的小工具不會提示更新、一鍵更新也拿不到新版。
+
 ## 使用者想改版面時
 
 版面在 `ios/Claude Token 用量.js`（每頁一個函式，見 README「修改」）。改完先預覽給使用者看，確認後再部署：

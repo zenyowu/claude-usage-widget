@@ -115,10 +115,31 @@ iOS 會依鎖定畫面配色自動上色，所以實際顏色跟著你的桌布�
 
 ### Siri 語音摘要
 
-「捷徑」App 新增捷徑：動作加 Scriptable 的「Run Script」選「Claude Token 用量」，再加「朗讀文字」（或「顯示結果」），
-捷徑取名「Claude 狀態」。之後說「嘿 Siri，Claude 狀態」就會念出：
+「捷徑」App 新增捷徑：動作加 Scriptable 的「Run Script」選「Claude Token 用量」，捷徑取名「Claude 狀態」。
+之後說「嘿 Siri，Claude 狀態」，Siri 會直接念出（不必再加「朗讀文字」動作）：
 
 > Claude 狀態：5 小時用了百分之42，1 小時 21 分後重置；每週用了百分之31；有 1 個 session 在等你回應；1 個 session 在執行；今天用了 169萬 token。
+
+### 設定頁（在 Scriptable 裡執行腳本）
+
+在 Scriptable 點「Claude Token 用量」會打開設定頁，所有選項都存在 iCloud，小工具與 App 共用：
+
+| 區塊 | 選項 |
+| --- | --- |
+| 預覽 | 八頁大尺寸、鎖定畫面長方形／圓形 |
+| 通知 | **額度重置時通知**（5 小時與每週額度回滿的那一刻，事先排好、時間準）、**5 小時額度用到門檻時通知**（70／80／90%，每個區段一次）、**有 session 等你回應時通知**（附「打開 session」按鈕）、送一則測試通知 |
+| 外觀 | **主題**：預設／暖橘漸層／夜空；**透明背景**（顯示桌布，iOS 27.2 以上） |
+| 提醒事項與行事曆 | 每週額度用到門檻時建一則提醒事項、把每週額度重置時間寫進行事曆（第一次會詢問權限） |
+| 版本 | 自動檢查新版（每 12 小時讀一次 GitHub 上的 `VERSION`，不傳出任何資料）；有新版時小工具底部會提示，設定頁可一鍵更新 |
+
+| 夜空 | 暖橘漸層 |
+| :-: | :-: |
+| <img src="docs/images/widgets/10-theme-night-large.png" width="300" alt="夜空主題"> | <img src="docs/images/widgets/11-theme-warm-large.png" width="300" alt="暖橘漸層主題"> |
+| <img src="docs/images/widgets/10-theme-night-medium.png" width="300" alt="夜空主題・中"> | <img src="docs/images/widgets/11-theme-warm-medium.png" width="300" alt="暖橘漸層主題・中"> |
+
+圖示使用 Apple 的 SF Symbols（模擬圖以色點代替，實機是真正的圖示）。iPad 的特大尺寸會使用大尺寸版面。
+
+通知只能在腳本執行時排定（小工具刷新或你點開時）：「額度重置」時間事先知道，會準時送達；「有 session 等你回應」則取決於 iOS 多久刷新小工具，可能晚幾分鐘。
 
 「幾分鐘前」與重置倒數由 iOS 即時跳動；其他數字在小工具刷新時更新（Mac 每 5 分鐘產生一次資料，
 iOS 自己決定多久刷新小工具，通常 5–30 分鐘）。用量、趣味、更多頁點一下會打開 Scriptable 立刻重抓；

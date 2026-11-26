@@ -25,6 +25,68 @@ const C = {
   bad: new Color("#d0554a"),
 };
 
+// ---------- 設定（存在 iCloud 的 Scriptable 資料夾，App 與小工具共用；在 App 裡執行腳本即可修改） ----------
+const VERSION = "2026.11.27";
+const REPO = "zeuikli/claude-usage-widget";
+const SETTINGS_PATH = fm.joinPath(fm.documentsDirectory(), "claude-usage-settings.json");
+const STATE_PATH = fm.joinPath(fm.documentsDirectory(), "claude-usage-state.json");
+const DEFAULTS = {
+  notifyReset: true,       // 5 小時／每週額度重置時推播
+  notifyHigh: true,        // 5 小時額度超過門檻時推播
+  highAt: 80,              // 門檻（%）
+  notifyWaiting: true,     // 有 session 等你回應時推播
+  transparent: false,      // 透明背景（iOS 27.2 以上）
+  theme: "default",        // default | warm | night
+  weeklyReminder: false,   // 每週額度超過門檻時建一則提醒事項
+  calendarReset: false,    // 每週額度重置時間寫進行事曆
+  checkUpdates: true,      // 每 12 小時查一次 GitHub 有沒有新版
+};
+function readJSON(p) {
+  try { return fm.fileExists(p) ? JSON.parse(fm.readString(p)) || {} : {}; } catch (e) { return {}; }
+}
+function writeJSON(p, v) { try { fm.writeString(p, JSON.stringify(v)); } catch (e) { console.log("寫入失敗：" + e); } }
+const SETTINGS = Object.assign({}, DEFAULTS, readJSON(SETTINGS_PATH));
+const MEMO = readJSON(STATE_PATH);    // what has already been notified / created, and the update check
+
+// Themes change the palette and the widget background; the transparent style shows the wallpaper.
+function applyTheme(w) {  // returns true when it set a gradient background
+  if (SETTINGS.theme === "night") {
+    Object.assign(C, { bg: new Color("#141a33"), card: new Color("#ffffff", 0.08), text: new Color("#f3f1ea"),
+                       dim: new Color("#aab0c6"), track: new Color("#ffffff", 0.18) });
+    const g = new LinearGradient();
+    g.colors = [new Color("#232c57"), new Color("#0d1124")];
+    g.locations = [0, 1];
+    w.backgroundGradient = g;
+    return true;
+  } else if (SETTINGS.theme === "warm") {
+    const g = new LinearGradient();
+    g.colors = [Color.dynamic(new Color("#f7cdb4"), new Color("#4a2a1e")), Color.dynamic(new Color("#faf9f5"), new Color("#1f1e1d"))];
+    g.locations = [0, 0.75];
+    w.backgroundGradient = g;
+    C.card = Color.dynamic(new Color("#ffffff", 0.55), new Color("#ffffff", 0.07));
+  }
+  if (SETTINGS.transparent) {
+    w.backgroundStyle = "transparent";   // iOS / iPadOS 27.2+; ignored before
+    C.card = Color.dynamic(new Color("#ffffff", 0.45), new Color("#000000", 0.3));
+  }
+  return SETTINGS.theme === "warm";
+}
+
+// Apple's SF Symbols; falls back to a text glyph if the symbol is missing.
+function sym(stack, name, size, color, fallback) {
+  try {
+    const s = SFSymbol.named(name);
+    if (s) {
+      s.applyFont(Font.boldSystemFont(size));
+      const i = stack.addImage(s.image);
+      i.imageSize = new Size(size * 1.1, size * 1.1);
+      i.tintColor = color;
+      return i;
+    }
+  } catch (e) {}
+  return label(stack, fallback || "•", size, color, "bold");
+}
+
 function fmt(n) {
   if (n >= 1e8) return (n / 1e8).toFixed(n >= 1e10 ? 0 : 1) + "億";
   if (n >= 1e4) return (n / 1e4).toFixed(n >= 1e6 ? 0 : 1) + "萬";
@@ -84,7 +146,7 @@ function addImg(stack, img, w, h) {
 function header(w, d, title) {
   const h = w.addStack();
   h.centerAlignContent();
-  label(h, "✻", S(12, 14), C.actual, "bold");
+  sym(h, "sparkle", S(12, 14), C.actual, "✻");
   h.addSpacer(4);
   label(h, title, S(12, 14), C.text, "bold");
   h.addSpacer();
@@ -347,7 +409,7 @@ function heartbeatLine(w, d, size, short) {
   const hb = heartbeat(d);
   const r = w.addStack();
   r.centerAlignContent();
-  label(r, "♥", size, hb.ok ? C.good : hb.known ? C.bad : C.dim, "bold");
+  sym(r, hb.ok ? "heart.fill" : hb.known ? "heart.slash.fill" : "heart", size, hb.ok ? C.good : hb.known ? C.bad : C.dim, "♥");
   r.addSpacer(4);
   label(r, short ? hb.short : hb.text, size, hb.ok ? C.dim : C.text);
   return r;
@@ -361,6 +423,8 @@ const STATE = {
   unread: ["有新回覆", C.cache],
   running: ["執行中", C.good],
 };
+const STATE_ICON = { question: "questionmark.circle.fill", approval: "hand.raised.fill", decide: "exclamationmark.circle.fill",
+                     unread: "envelope.badge.fill", running: "bolt.fill" };
 function counts(d) {
   const live = d.live || [];
   return {
@@ -381,7 +445,7 @@ function sessionCard(w, x, width, withAsk) {
   if (x.bridge && /^session_[A-Za-z0-9]+$/.test(x.bridge)) c.url = "https://claude.ai/code/" + x.bridge;
   const r = c.addStack();
   r.centerAlignContent();
-  label(r, "●", S(8, 10), st[1], "bold");
+  sym(r, STATE_ICON[x.state] || "circle.fill", S(10, 12), st[1], "●");
   r.addSpacer(S(5, 7));
   // A long title gives way (slight shrink, then …) so the state on the right always shows.
   label(r, x.title, S(11, 13), C.text).minimumScaleFactor = 0.85;
@@ -1174,6 +1238,162 @@ function insightPage(w, d, family) {
   tile(g2, "Claude Code 版本", v.length ? v[2] + " 個" : "—", v.length ? v[0] + " → " + v[1] : "", C.actual, tw, 18);
 }
 
+// ---------- 通知、提醒事項、行事曆、版本檢查（每次腳本執行時順便做；任何一項失敗都不影響小工具） ----------
+async function notify(id, title, body, opts) {
+  const n = new Notification();
+  n.identifier = id;
+  n.title = title;
+  n.body = body;
+  n.threadIdentifier = "claude-usage";
+  n.sound = (opts && opts.sound) || "default";
+  if (opts && opts.at) n.setTriggerDate(opts.at);
+  if (opts && opts.url) { n.openURL = opts.url; n.addAction("打開 session", opts.url); }
+  await n.schedule();
+}
+async function sideEffects(d) {
+  if (!d) return;
+  const now = Date.now();
+  const main = mainLimits(d).filter(x => x.source !== "desktop");
+  // 1. Reset reminders are scheduled ahead for the exact reset time (same identifier = rescheduled, not duplicated).
+  for (const x of main) {
+    const id = "claude-reset-" + (x.label === "5 小時" ? "5h" : "week");
+    try {
+      if (SETTINGS.notifyReset && x.resets && new Date(x.resets) > now && x.percent > 0) {
+        await notify(id, "Claude " + x.label + "額度回滿了", "剛重置，可以繼續放心用。", { at: new Date(x.resets), sound: "complete" });
+      } else await Notification.removePending([id]);
+    } catch (e) { console.log("排定重置通知失敗：" + e); }
+  }
+  // 2. High use: once per 5-hour window.
+  const five = main.find(x => x.label === "5 小時");
+  if (SETTINGS.notifyHigh && five && limitPct(five) >= SETTINGS.highAt && MEMO.highFor !== five.resets) {
+    try {
+      await notify("claude-high", "Claude 5 小時額度用了 " + limitPct(five) + "%", resetText(five, false) + "。", {});
+      MEMO.highFor = five.resets;
+    } catch (e) { console.log("高用量通知失敗：" + e); }
+  }
+  // 3. A session waiting on you: once per session and turn.
+  if (SETTINGS.notifyWaiting) {
+    const seen = new Set(MEMO.waited || []);
+    for (const x of (d.live || []).filter(x => ["question", "approval", "decide"].includes(x.state))) {
+      const key = x.title + "|" + x.at;
+      if (seen.has(key)) continue;
+      try {
+        const url = x.bridge && /^session_[A-Za-z0-9]+$/.test(x.bridge) ? "https://claude.ai/code/" + x.bridge : "claude://";
+        await notify("claude-wait-" + key, "「" + x.title + "」" + STATE[x.state][0], x.ask || "點一下打開 Claude 回應。", { url });
+        seen.add(key);
+      } catch (e) { console.log("等待通知失敗：" + e); }
+    }
+    MEMO.waited = [...seen].slice(-50);
+  }
+  // 8. Reminders and calendar (asks for permission the first time; turn on in the settings page).
+  const week = main.find(x => x.label === "每週");
+  if (SETTINGS.weeklyReminder && week && limitPct(week) >= SETTINGS.highAt && MEMO.reminderFor !== week.resets) {
+    try {
+      const r = new Reminder();
+      r.title = "Claude 每週額度已用 " + limitPct(week) + "%";
+      r.notes = resetText(week, false);
+      r.dueDate = new Date(now + 60 * 60 * 1000);
+      r.calendar = await Calendar.defaultForReminders();
+      r.save();
+      MEMO.reminderFor = week.resets;
+    } catch (e) { console.log("建立提醒事項失敗：" + e); }
+  }
+  if (SETTINGS.calendarReset && week && week.resets && MEMO.eventFor !== week.resets) {
+    try {
+      const ev = new CalendarEvent();
+      ev.title = "Claude 每週額度重置";
+      ev.startDate = new Date(week.resets);
+      ev.endDate = new Date(new Date(week.resets).getTime() + 15 * 60 * 1000);
+      ev.calendar = await Calendar.defaultForEvents();
+      ev.save();
+      MEMO.eventFor = week.resets;
+    } catch (e) { console.log("寫入行事曆失敗：" + e); }
+  }
+  // 5. New version on GitHub? Only reads a tiny text file, at most every 12 hours; nothing is sent.
+  if (SETTINGS.checkUpdates && (!MEMO.checkedAt || now - MEMO.checkedAt > 12 * 3600 * 1000)) {
+    await checkUpdate();
+  }
+  writeJSON(STATE_PATH, MEMO);
+}
+async function checkUpdate() {
+  try {
+    const r = new Request("https://raw.githubusercontent.com/" + REPO + "/main/VERSION");
+    r.timeoutInterval = 8;
+    const v = (await r.loadString()).trim();
+    if (/^\d{4}\.\d{1,2}\.\d{1,2}(\.\d+)?$/.test(v)) { MEMO.latest = v; MEMO.checkedAt = Date.now(); }
+  } catch (e) { console.log("檢查更新失敗：" + e); }
+}
+function newer(a, b) {  // is version a newer than b?
+  const x = String(a || "").split(".").map(Number), y = String(b || "").split(".").map(Number);
+  for (let i = 0; i < Math.max(x.length, y.length); i++) if ((x[i] || 0) !== (y[i] || 0)) return (x[i] || 0) > (y[i] || 0);
+  return false;
+}
+function hasUpdate() { return SETTINGS.checkUpdates && newer(MEMO.latest, VERSION); }
+
+// Replace this script with the newest one from GitHub (only when you tap it in the settings page).
+async function selfUpdate() {
+  const r = new Request("https://raw.githubusercontent.com/" + REPO + "/main/ios/" + encodeURIComponent("Claude Token 用量.js"));
+  r.timeoutInterval = 20;
+  const code = await r.loadString();
+  if (!code.includes("Script.setWidget") || !code.includes("const VERSION")) throw new Error("下載的內容不像這個小工具");
+  fm.writeString(module.filename, code);
+}
+
+// ---------- App 裡的設定頁 ----------
+async function settingsPage(data) {
+  const t = new UITable();
+  t.showSeparators = true;
+  const save = () => writeJSON(SETTINGS_PATH, SETTINGS);
+  const header = text => { const r = new UITableRow(); r.isHeader = true; r.addText(text); t.addRow(r); };
+  const action = (title, sub, fn, dismiss) => {
+    const r = new UITableRow();
+    r.height = sub ? 60 : 44;
+    r.addText(title, sub);
+    r.dismissOnSelect = !!dismiss;
+    r.onSelect = async () => { await fn(); render(); };
+    t.addRow(r);
+  };
+  const toggle = (key, title, sub) => action((SETTINGS[key] ? "☑︎  " : "☐  ") + title, sub, () => { SETTINGS[key] = !SETTINGS[key]; save(); });
+  const preview = async (page, fam) => {
+    BIG = fam === "large";
+    const w = build(page, data, fam);
+    if (fam === "accessoryRectangular") await w.presentAccessoryRectangular();
+    else if (fam === "accessoryCircular") await w.presentAccessoryCircular();
+    else await w.presentLarge();
+  };
+  function render() {
+    t.removeAllRows();
+    header("預覽（大尺寸）");
+    PAGES.forEach(([name, page]) => action(name, null, () => preview(page, "large")));
+    action("鎖定畫面・長方形", null, () => preview(usagePage, "accessoryRectangular"));
+    action("鎖定畫面・圓形", null, () => preview(usagePage, "accessoryCircular"));
+    header("通知");
+    toggle("notifyReset", "額度重置時通知", "5 小時與每週額度回滿的那一刻（事先排好，時間準）");
+    toggle("notifyHigh", "5 小時額度用到 " + SETTINGS.highAt + "% 時通知", "每個 5 小時區段最多一次");
+    action("　門檻：" + SETTINGS.highAt + "%（點一下切換 70／80／90）", null, () => {
+      SETTINGS.highAt = SETTINGS.highAt >= 90 ? 70 : SETTINGS.highAt + 10; save(); });
+    toggle("notifyWaiting", "有 session 等你回應時通知", "小工具刷新時才會發現，可能晚幾分鐘");
+    action("送一則測試通知", null, () => notify("claude-test", "Claude 用量小工具", "通知正常運作。", {}));
+    header("外觀");
+    toggle("transparent", "透明背景", "顯示桌布（iOS 27.2 以上才有效）");
+    action("主題：" + ({ default: "預設", warm: "暖橘漸層", night: "夜空" }[SETTINGS.theme] || "預設") + "（點一下切換）", null, () => {
+      const order = ["default", "warm", "night"]; SETTINGS.theme = order[(order.indexOf(SETTINGS.theme) + 1) % order.length]; save(); });
+    header("提醒事項與行事曆");
+    toggle("weeklyReminder", "每週額度用到 " + SETTINGS.highAt + "% 時建提醒事項", "第一次會詢問提醒事項權限");
+    toggle("calendarReset", "把每週額度重置時間寫進行事曆", "第一次會詢問行事曆權限");
+    header("版本");
+    toggle("checkUpdates", "自動檢查新版", "每 12 小時讀一次 GitHub 上的版本號，不傳出任何資料");
+    action("目前 " + VERSION + (MEMO.latest ? "・GitHub 最新 " + MEMO.latest : ""), "點一下立刻檢查", async () => {
+      await checkUpdate(); writeJSON(STATE_PATH, MEMO); });
+    if (hasUpdate()) action("更新到 " + MEMO.latest, "從 GitHub 下載新版取代這個腳本，完成後重新執行", async () => {
+      try { await selfUpdate(); const a = new Alert(); a.title = "已更新"; a.message = "請關掉後重新執行腳本。"; a.addAction("好"); await a.present(); }
+      catch (e) { const a = new Alert(); a.title = "更新失敗"; a.message = String(e); a.addAction("好"); await a.present(); } }, true);
+    t.reload();
+  }
+  render();
+  await t.present(true);
+}
+
 // ---------- 主程式 ----------
 const PAGES = [["用量", usagePage], ["趣味", funPage], ["更多", morePage], ["狀態", statusPage], ["寵物", petPage], ["額度", limitsPage], ["日曆", calendarPage], ["洞察", insightPage]];
 function pickPage(param) {
@@ -1189,7 +1409,6 @@ function pickPage(param) {
 }
 function newWidget() {
   const w = new ListWidget();
-  w.backgroundColor = C.bg;
   w.setPadding(12, 14, 12, 14);
   w.refreshAfterDate = nextRefresh(null);
   return w;
@@ -1230,8 +1449,13 @@ function nextRefresh(data) {
 }
 
 function build(page, data, family) {
+  // iPad extra large sizes (9): use the roomy large layout; it sits centred in the wider widget.
+  if (family === "extraLarge" || family === "extraLargePortrait") family = "large";
   BIG = family === "large";
   const w = newWidget();
+  if (!String(family).startsWith("accessory")) {  // the lock screen keeps the system's own background
+    if (!applyTheme(w)) w.backgroundColor = C.bg;  // a gradient theme sets its own background
+  }
   w.refreshAfterDate = nextRefresh(data);
   if (!data) {
     header(w, null, "Claude");
@@ -1244,6 +1468,14 @@ function build(page, data, family) {
     lockPage(w, data, family);  // lock screen: one design for every parameter
   } else {
     page(w, data, family);
+    if (hasUpdate() && family !== "small") {
+      w.addSpacer(2);
+      const u = w.addStack();
+      u.addSpacer();
+      sym(u, "arrow.down.circle.fill", 9, C.cache, "↓");
+      u.addSpacer(3);
+      label(u, "有新版 " + MEMO.latest + "，在 Scriptable 執行腳本即可更新", 8, C.cache);
+    }
   }
   return w;
 }
@@ -1251,16 +1483,16 @@ function build(page, data, family) {
 const data = await loadData();
 if (config.runsInWidget) {
   Script.setWidget(build(pickPage(args.widgetParameter), data, config.widgetFamily || "large"));
+  try { await sideEffects(data); } catch (e) { console.log(e); }
 } else if (!config.runsInApp) {
   // Run from Shortcuts or Siri: no menu; loading the data above already refreshed the phone's cached copy.
   // Hand back a sentence Siri can read out.
   Script.setShortcutOutput(spokenSummary(data));
+  if (config.runsWithSiri) Speech.speak(spokenSummary(data));  // (4) Siri reads it out, no extra Shortcuts action needed
+  try { await sideEffects(data); } catch (e) { console.log(e); }
 } else {
-  // Run inside the app: ask which page to preview.
-  const a = new Alert();
-  a.title = "預覽哪一頁？";
-  PAGES.forEach(([n]) => a.addAction(n));
-  const pick = await a.presentSheet();
-  if (pick >= 0) await build(PAGES[pick][1], data, "large").presentLarge();
+  // Run inside the app: the settings page (previews, notifications, look, reminders, updates).
+  try { await sideEffects(data); } catch (e) { console.log(e); }
+  await settingsPage(data);
 }
 Script.complete();
