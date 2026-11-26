@@ -32,7 +32,7 @@ Claude 會：檢查環境 → 問你兩個選項（插電時是否保持清醒�
 
 ## 會看到什麼
 
-小工具有七頁，用「參數」選頁（長按小工具 → 編輯小工具 → Parameter）。每頁都有小、中、大三種尺寸。
+小工具有八頁，用「參數」選頁（長按小工具 → 編輯小工具 → Parameter）。每頁都有小、中、大三種尺寸。
 
 | 參數 | 頁面 | 內容 |
 | --- | --- | --- |
@@ -43,10 +43,11 @@ Claude 會：檢查環境 → 問你兩個選項（插電時是否保持清醒�
 | 寵物 | 小克 | 一隻跟著 session 狀態換表情的小寵物；體力＝5 小時額度、飽足＝今天用量、天線＝Remote Control |
 | 額度 | 方案額度 | 圓環儀表、即時倒數到重置、照目前速度重置前會用到多少 |
 | 日曆 | 使用日曆 | 半年熱力圖（像 GitHub 的貢獻圖）、目前與最長連續天數、最忙的一週 |
+| 洞察 | 背後的數據 | 你說一句 Claude 回幾次、思考占輸出多少、工具成功率、子代理用的模型、自動核准與壓縮次數、Claude Code 版本 |
 
 另外還有**鎖定畫面小工具**（圓形、長方形、單行）與 **Siri 語音摘要**，見下方。
 
-以下是 7 頁 × 3 種尺寸的模擬圖（示範資料，非真實帳號）。實機字型寬度會略有不同。
+以下是 8 頁 × 3 種尺寸的模擬圖（示範資料，非真實帳號）。實機字型寬度會略有不同。
 
 ### 用量（參數留空）
 
@@ -91,6 +92,16 @@ Claude 會：檢查環境 → 問你兩個選項（插電時是否保持清醒�
 | 小 | 中 | 大 |
 | :-: | :-: | :-: |
 | <img src="docs/images/widgets/7-calendar-small.png" width="170" alt="日曆・小"> | <img src="docs/images/widgets/7-calendar-medium.png" width="340" alt="日曆・中"> | <img src="docs/images/widgets/7-calendar-large.png" width="340" alt="日曆・大"> |
+
+### 洞察
+
+| 小 | 中 | 大 |
+| :-: | :-: | :-: |
+| <img src="docs/images/widgets/9-insight-small.png" width="170" alt="洞察・小"> | <img src="docs/images/widgets/9-insight-medium.png" width="340" alt="洞察・中"> | <img src="docs/images/widgets/9-insight-large.png" width="340" alt="洞察・大"> |
+
+這些都從本機 Claude Code 紀錄算出來（近 30 天）：你送出的訊息數、每則回覆的停止原因（還要用工具，或這回合結束）、
+輸出 token 裡思考占多少與每次思考花多久、工具結果是否出錯、你按 Esc 中斷的次數、自動壓縮對話時的 token 數、
+子代理實際跑的模型、權限決定（設定自動核准／你親手核准／被擋下），以及用過的 Claude Code 版本。
 
 ### 鎖定畫面
 
@@ -164,7 +175,7 @@ launchctl kickstart -k gui/$(id -u)/claude-usage-widget.export
 
 ## 修改
 
-- 版面都在 `ios/Claude Token 用量.js`，每一頁是一個函式：`usagePage`、`funPage`、`morePage`、`statusPage`、`petPage`、`limitsPage`、`calendarPage`，鎖定畫面是 `lockPage`。
+- 版面都在 `ios/Claude Token 用量.js`，每一頁是一個函式：`usagePage`、`funPage`、`morePage`、`statusPage`、`petPage`、`limitsPage`、`calendarPage`、`insightPage`，鎖定畫面是 `lockPage`。
   大尺寸用 `BIG` 與 `S(小, 大)` 切換字級；`contentWidth()` 依 iPhone 寬度算內容寬（內容超過實際寬度時，iOS 會把整列字縮小）。
 - 資料欄位在 Mac 的 `export_usage.py` 最後組成 `summary`；加欄位後小工具才讀得到。
 - 預覽：不用 iPhone 也能看版面。
@@ -174,7 +185,7 @@ launchctl kickstart -k gui/$(id -u)/claude-usage-widget.export
   cd tools/preview && python3 -m http.server 8765
   ```
 
-  用瀏覽器開 `http://127.0.0.1:8765/?data=sample.json`（示範資料），一次看 7 頁 × 3 尺寸（加 `&lock=1` 看鎖定畫面）；
+  用瀏覽器開 `http://127.0.0.1:8765/?data=sample.json`（示範資料），一次看 8 頁 × 3 尺寸（加 `&lock=1` 看鎖定畫面）；
   `&pages=狀態,寵物` 只看指定頁；`&pages=寵物&only=large&shot=1` 只畫一個小工具（README 的圖就是這樣截的）。想看自己的資料，把 iCloud 的 `claude-usage.json` 複製到 `tools/preview/`，網址拿掉 `?data=sample.json`。
   超出邊框的會標紅框。預覽器的尺寸是在 402pt 寬的 iPhone 量的（中、大 360pt 寬，大尺寸 359pt 高），
   實機字寬會略有差異，最後以手機為準。
@@ -182,7 +193,7 @@ launchctl kickstart -k gui/$(id -u)/claude-usage-widget.export
 
 ## 資料與隱私
 
-- 只讀本機檔案：`~/.claude/projects/**/*.jsonl`（token 數、時間、工具名稱、專案資料夾名稱）、
+- 只讀本機檔案：`~/.claude/projects/**/*.jsonl`（token 數、時間、工具名稱、專案資料夾名稱，以及停止原因、思考時間、工具是否出錯、權限決定等統計欄位）、
   Claude Desktop 的 session 紀錄（標題、狀態）與 `remote-control-state.json`。**不讀對話內容。**
 - 會寫進你自己 iCloud 的內容：用量數字、專案資料夾名稱、session 標題與它們的 Remote Control 連結。
   若標題或專案名稱敏感，分享截圖前請留意。

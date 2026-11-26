@@ -41,16 +41,64 @@ sub_replies = [0]                            # replies made by subagents
 thinking = [0]
 today_span = [None, None]                    # first and last reply today (local time)
 today_iso = now.date().isoformat()
+# "Insights" (last 30 days): what happens behind each reply. Counted from user/system lines too.
+ins = defaultdict(int)
+think_ms, compact_tokens = [], []
+sub_models, versions, branches = defaultdict(int), set(), set()
+
+
+def note_other(d, t):
+    """Count the non-reply lines of the last 30 days: your prompts, tool results, interruptions, compactions."""
+    if d.get("version"):
+        versions.add(d["version"])
+    if d.get("gitBranch") not in (None, "", "HEAD"):
+        branches.add(d["gitBranch"])
+    pd = d.get("permissionDecision")
+    if isinstance(pd, dict):
+        ins["perm_" + ("user" if str(pd.get("source", "")).startswith("user") else pd.get("decision", "?"))] += 1
+    if d.get("type") == "system":
+        st = d.get("subtype")
+        if st == "compact_boundary":
+            ins["compactions"] += 1
+            compact_tokens.append(int((d.get("compactMetadata") or {}).get("preTokens") or 0))
+        elif st == "api_error":
+            ins["api_errors"] += 1
+        return
+    tur = d.get("toolUseResult")
+    if isinstance(tur, dict):
+        if tur.get("resolvedModel"):
+            sub_models[tur["resolvedModel"]] += 1
+        if tur.get("timedOutAfterMs"):
+            ins["timeouts"] += 1
+    c = (d.get("message") or {}).get("content")
+    blocks = c if isinstance(c, list) else [{"type": "text", "text": c}] if isinstance(c, str) else []
+    results = [b for b in blocks if isinstance(b, dict) and b.get("type") == "tool_result"]
+    ins["tool_results"] += len(results)
+    ins["tool_errors"] += sum(1 for b in results if b.get("is_error"))
+    text = " ".join(str(b.get("text", "")) for b in blocks if isinstance(b, dict) and b.get("type") == "text")
+    if "[Request interrupted" in text:
+        ins["interrupts"] += 1
+    elif not results and text.strip() and not text.lstrip().startswith("<") and not d.get("isMeta") \
+            and not d.get("isSidechain") and not d.get("isCompactSummary"):
+        ins["prompts"] += 1
+
+
 for path in glob.glob(root + "/**/*.jsonl", recursive=True):
     if os.path.getmtime(path) < since.timestamp():
         continue
     with open(path, errors="ignore") as f:
         for line in f:
-            if '"usage"' not in line:
+            other = '"type":"user"' in line or '"type":"system"' in line
+            if '"usage"' not in line and not other:
                 continue
             try:
                 d = json.loads(line)
             except ValueError:
+                continue
+            if d.get("type") in ("user", "system"):
+                ts = d.get("timestamp")
+                if ts and datetime.datetime.fromisoformat(ts.replace("Z", "+00:00")) >= start30:
+                    note_other(d, ts)
                 continue
             m = d.get("message") or {}
             u, ts = m.get("usage"), d.get("timestamp")
@@ -72,6 +120,8 @@ for path in glob.glob(root + "/**/*.jsonl", recursive=True):
                             tools[name.split("__")[-1]] += 1
                     elif b.get("type") == "thinking":
                         thinking[0] += 1
+                if d.get("thinkingDurationMs"):
+                    think_ms.append(int(d["thinkingDurationMs"]))
             key = (m.get("id"), d.get("requestId"))
             if key in seen:
                 continue
@@ -97,6 +147,11 @@ for path in glob.glob(root + "/**/*.jsonl", recursive=True):
                     sess = sessions[d.get("sessionId") or path]
                     sess[0] += 1
                     sess[1], sess[2] = proj or "~", t.date().isoformat()
+                ins["stop_" + str(m.get("stop_reason"))] += 1
+                ins["thinking_tokens"] += int((u.get("output_tokens_details") or {}).get("thinking_tokens") or 0)
+                cc = u.get("cache_creation") or {}
+                ins["write_1h"] += int(cc.get("ephemeral_1h_input_tokens") or 0)
+                ins["write_5m"] += int(cc.get("ephemeral_5m_input_tokens") or 0)
                 if t.date().isoformat() == today_iso:
                     hm = t.strftime("%H:%M")
                     today_span[0] = min(today_span[0] or hm, hm)
@@ -343,6 +398,13 @@ if os.path.isdir(widget_dir):
         "tools": sorted(tools.items(), key=lambda kv: -kv[1])[:8], "tool_calls": sum(tools.values()),
         "sessions": len(sessions), "longest_session": max(sessions.values(), default=[0, "", ""]),
         "subagent_replies": sub_replies[0], "thinking_blocks": thinking[0], "today_span": today_span,
+        "insights": dict(ins, think_ms_median=sorted(think_ms)[len(think_ms) // 2] if think_ms else 0,
+                         think_ms_p90=sorted(think_ms)[int(len(think_ms) * 0.9)] if think_ms else 0,
+                         compact_tokens_median=sorted(compact_tokens)[len(compact_tokens) // 2] if compact_tokens else 0,
+                         sub_models=sorted(sub_models.items(), key=lambda kv: -kv[1])[:5],
+                         versions=[min(versions, key=lambda v: [int(x) for x in v.split(".") if x.isdigit()]),
+                                   max(versions, key=lambda v: [int(x) for x in v.split(".") if x.isdigit()]), len(versions)]
+                         if versions else [], branches=len(branches)),
         "live": live_sessions(), "remote_sessions": remote[0], "limits": plan_limits(),
         "heartbeat": read_heartbeat()})
     # Written in place by the LaunchAgent. Under launchd, opening or renaming onto an iCloud Drive file

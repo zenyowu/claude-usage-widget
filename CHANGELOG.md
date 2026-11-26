@@ -1,5 +1,25 @@
 # 更新紀錄
 
+## 2026-11-26（深夜）
+
+### 第八頁「洞察」：每則回覆背後發生了什麼
+
+Mac 端多讀逐字稿裡的使用者與系統紀錄（不只帶 usage 的回覆），近 30 天新增 `insights`：
+
+| 指標 | 來源欄位 |
+| --- | --- |
+| 你送出的訊息數、你說一句它回幾次 | 使用者訊息（排除工具結果、系統注入、子代理與壓縮摘要） |
+| 每回合平均動手幾次 | 回覆的 `stop_reason`：`tool_use` ÷ `end_turn` |
+| 思考占輸出、思考時間中位數與 p90 | `usage.output_tokens_details.thinking_tokens`、`thinkingDurationMs` |
+| 工具成功率、逾時 | `tool_result.is_error`、`toolUseResult.timedOutAfterMs` |
+| 中斷、壓縮對話與當時 token 數、API 錯誤 | `[Request interrupted`、`compact_boundary.compactMetadata.preTokens`、`api_error` |
+| 子代理實際模型 | `toolUseResult.resolvedModel` |
+| 自動核准／親手核准／擋下 | `permissionDecision` |
+| Claude Code 版本、碰過的 git 分支數 | `version`、`gitBranch` |
+
+使用者訊息的分類以抽樣檢查：計入的都是人打的指令，任務通知、子代理訊息、壓縮摘要與圖片說明都被排除。
+匯出時間由約 4 秒增為約 13 秒（每 5 分鐘一次、低優先權）。
+
 ## 2026-11-26（晚）
 
 ### 新功能

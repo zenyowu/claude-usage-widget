@@ -1105,10 +1105,76 @@ function spokenSummary(d) {
   return "Claude 狀態：" + parts.join("；") + "。";
 }
 
+// ---- 洞察：每則回覆背後發生了什麼（近 30 天） ----
+function modelName(m) {
+  const x = String(m).replace("claude-", "").split("-");
+  return x[0].charAt(0).toUpperCase() + x[0].slice(1) + " " + x.slice(1).join(".");
+}
+function pct(a, b) { return b ? Math.round(a / b * 1000) / 10 : 0; }
+function insightPage(w, d, family) {
+  const i = d.insights;
+  if (!i || !i.prompts) return oldData(w, "Claude 洞察", d);
+  const L = d.last30;
+  const perPrompt = Math.round(L.replies / i.prompts);
+  const turns = (i.stop_end_turn || 0) + (i.stop_tool_use || 0);
+  const toolsPerTurn = i.stop_end_turn ? Math.round(i.stop_tool_use / i.stop_end_turn) : 0;
+  const thinkShare = Math.round(pct(i.thinking_tokens, L.output));
+  const okRate = i.tool_results ? Math.round((1 - i.tool_errors / i.tool_results) * 1000) / 10 : 100;
+  const sec = ms => (ms / 1000).toFixed(ms < 10000 ? 1 : 0) + " 秒";
+  if (family === "small") {
+    header(w, d, "洞察");
+    w.addSpacer(6);
+    label(w, "你說一句，它回", 10, C.actual, "bold");
+    label(w, perPrompt + " 次", 26, C.text, "round");
+    label(w, "近 30 天 " + num(i.prompts) + " 句話", 9, C.dim);
+    w.addSpacer();
+    const r = w.addStack();
+    r.centerAlignContent();
+    label(r, "思考占輸出 ", 10, C.dim);
+    label(r, thinkShare + "%", 13, C.cache, "round");
+    return;
+  }
+  const cw = contentWidth();
+  header(w, d, "Claude 洞察");
+  w.addSpacer(family === "large" ? 10 : 6);
+  tiles(w, [
+    ["你說一句，它回", perPrompt + " 次", "近 30 天 " + num(i.prompts) + " 句話", C.actual],
+    ["思考占輸出", thinkShare + "%", "中位數想 " + sec(i.think_ms_median), C.cache],
+    ["工具成功率", okRate + "%", num(i.tool_errors) + " 次出錯", okRate >= 97 ? C.good : C.warn],
+  ], cw);
+  if (family === "medium") {
+    w.addSpacer(8);
+    label(w, "每回合平均動手 " + toolsPerTurn + " 次・被你中斷 " + (i.interrupts || 0) + " 次・壓縮對話 " + (i.compactions || 0) + " 次", 10, C.dim);
+    const top = (i.sub_models || [])[0], subTotal = (i.sub_models || []).reduce((a, x) => a + x[1], 0);
+    if (top) {
+      w.addSpacer(3);
+      label(w, "子代理最常用 " + modelName(top[0]) + "（" + Math.round(top[1] / subTotal * 100) + "%）・自動核准 " + num(i.perm_accept || 0) + " 次", 10, C.dim);
+    }
+    w.addSpacer();
+    return;
+  }
+  w.addSpacer(14);
+  label(w, "子代理用的模型", 12, C.dim, "bold");
+  w.addSpacer(6);
+  const sm = (i.sub_models || []).slice(0, 4).map(([m, n]) => [modelName(m), n]);
+  if (sm.length) addImg(w, rankBars(sm, cw, 20, 96, num, 12), cw, 20 * sm.length);
+  w.addSpacer();
+  const tw = Math.floor((cw - 8) / 2);
+  const g1 = w.addStack(); g1.spacing = 8;
+  tile(g1, "自動核准", num(i.perm_accept || 0) + " 次", "你親手核准 " + num(i.perm_user || 0) + "・擋下 " + num(i.perm_reject || 0), C.good, tw, 18);
+  tile(g1, "壓縮對話", (i.compactions || 0) + " 次", "通常在 " + fmt(i.compact_tokens_median || 0) + " token 時", C.cache, tw, 18);
+  w.addSpacer(8);
+  const g2 = w.addStack(); g2.spacing = 8;
+  tile(g2, "每回合動手", toolsPerTurn + " 次", "被你中斷 " + (i.interrupts || 0) + " 次", C.actual, tw, 18);
+  const v = i.versions || [];
+  tile(g2, "Claude Code 版本", v.length ? v[2] + " 個" : "—", v.length ? v[0] + " → " + v[1] : "", C.actual, tw, 18);
+}
+
 // ---------- 主程式 ----------
-const PAGES = [["用量", usagePage], ["趣味", funPage], ["更多", morePage], ["狀態", statusPage], ["寵物", petPage], ["額度", limitsPage], ["日曆", calendarPage]];
+const PAGES = [["用量", usagePage], ["趣味", funPage], ["更多", morePage], ["狀態", statusPage], ["寵物", petPage], ["額度", limitsPage], ["日曆", calendarPage], ["洞察", insightPage]];
 function pickPage(param) {
   const p = String(param || "").replace(/\s+/g, "").toLowerCase();
+  if (p.includes("洞察") || p.includes("insight")) return insightPage;
   if (p.includes("日曆") || p.includes("calendar")) return calendarPage;
   if (p.includes("額度") || p.includes("limit")) return limitsPage;
   if (p.includes("寵物") || p.includes("小克") || p.includes("pet")) return petPage;

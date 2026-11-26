@@ -61,7 +61,7 @@ launchctl kickstart -k gui/$(id -u)/claude-usage-widget.export
 2. 在 Scriptable 腳本清單等「**Claude Token 用量**」出現（iCloud 同步可能 1–5 分鐘），點一下執行，選一頁預覽。
 3. 長按主畫面空白處 → 左上「＋」→ 搜尋 **Scriptable** → 選尺寸（建議「大」）→ 加入小工具。
 4. 長按新的小工具 →「編輯小工具」→ Script 選「Claude Token 用量」→ Parameter 填頁面名稱：
-   留空＝用量、`趣味`、`更多`、`狀態`、`寵物`、`額度`、`日曆`。
+   留空＝用量、`趣味`、`更多`、`狀態`、`寵物`、`額度`、`日曆`、`洞察`。
 5. 想看多頁：加多個小工具疊成「智慧型堆疊」，上下滑切換。
 6. 選用：鎖定畫面小工具（長按鎖定畫面 → 自訂 → 加 Scriptable 小工具）、Siri 語音摘要（見 README「Siri 語音摘要」）。
 
