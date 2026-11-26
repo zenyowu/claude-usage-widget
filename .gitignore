@@ -1,0 +1,4 @@
+.DS_Store
+tools/preview/w.js
+tools/preview/claude-usage.json
+*.log

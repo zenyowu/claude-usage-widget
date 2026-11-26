@@ -1,0 +1,139 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>widget preview</title>
+<style>
+  body { margin: 0; padding: 16px; background: #6b6158; font-family: -apple-system, "PingFang TC", sans-serif; }
+  .grid { display: grid; grid-template-columns: 169px 360px 360px; gap: 18px; align-items: start; }
+  .cell { display: flex; flex-direction: column; gap: 4px; }
+  .cap { color: #fff; font-size: 11px; }
+  .widget { border-radius: 22px; overflow: hidden; position: relative; box-sizing: border-box; display: flex; flex-direction: column; }
+  .widget.over { outline: 3px solid #ff2d55; }
+  .stack { display: flex; min-width: 0; min-height: 0; box-sizing: border-box; }
+  .h { flex-direction: row; align-items: flex-start; }
+  .h.center { align-items: center; }
+  .v { flex-direction: column; align-items: flex-start; }
+  .t { white-space: pre; overflow: hidden; text-overflow: ellipsis; min-width: 0; flex-shrink: 1; line-height: 1.2; }
+  .t.wrap { white-space: normal; display: -webkit-box; -webkit-box-orient: vertical; }
+  .flex { flex: 1 1 0; min-width: 0; min-height: 0; }
+  img { flex-shrink: 0; display: block; }
+</style>
+<div class="grid" id="grid"></div>
+<script type="module">
+const SIZES = { small: [169, 169], medium: [360, 169], large: [360, 359] };  // measured on the iPhone (402 pt wide)
+const hex = (h, a) => { h = h.replace("#", ""); const n = parseInt(h, 16);
+  return `rgba(${n >> 16 & 255},${n >> 8 & 255},${n & 255},${a ?? 1})`; };
+class Color { constructor(h, a) { this.css = hex(h, a); } static dynamic(l) { return l; }
+  static white() { return new Color("#ffffff"); } static gray() { return new Color("#8e8e93"); } static black() { return new Color("#000000"); } }
+const Font = { systemFont: s => ({ s, w: 400 }), boldSystemFont: s => ({ s, w: 700 }), mediumSystemFont: s => ({ s, w: 500 }),
+  semiboldSystemFont: s => ({ s, w: 600 }), heavySystemFont: s => ({ s, w: 800 }), roundedSystemFont: s => ({ s, w: 400, r: 1 }),
+  boldRoundedSystemFont: s => ({ s, w: 700, r: 1 }), lightSystemFont: s => ({ s, w: 300 }) };
+class Size { constructor(w, h) { this.width = w; this.height = h; } }
+class Point { constructor(x, y) { this.x = x; this.y = y; } }
+class Rect { constructor(x, y, w, h) { Object.assign(this, { x, y, width: w, height: h }); } }
+class Path { constructor() { this.ops = []; }
+  move(p) { this.ops.push(c => c.moveTo(p.x, p.y)); } addLine(p) { this.ops.push(c => c.lineTo(p.x, p.y)); }
+  addQuadCurve(p, cp) { this.ops.push(c => c.quadraticCurveTo(cp.x, cp.y, p.x, p.y)); }
+  addCurve(p, c1, c2) { this.ops.push(c => c.bezierCurveTo(c1.x, c1.y, c2.x, c2.y, p.x, p.y)); }
+  addRect(r) { this.ops.push(c => c.rect(r.x, r.y, r.width, r.height)); }
+  addEllipse(r) { this.ops.push(c => c.ellipse(r.x + r.width / 2, r.y + r.height / 2, r.width / 2, r.height / 2, 0, 0, 7)); }
+  addRoundedRect(r, a) { this.ops.push(c => c.roundRect(r.x, r.y, r.width, r.height, Math.min(a, r.width / 2, r.height / 2))); }
+  closeSubpath() { this.ops.push(c => c.closePath()); } }
+class DrawContext {
+  constructor() { this.cv = document.createElement("canvas"); this.align = "left"; this.font = { s: 10, w: 400 }; this.tc = "#000"; }
+  set size(s) { this._s = s; this.cv.width = s.width * 3; this.cv.height = s.height * 3; this.c = this.cv.getContext("2d"); this.c.scale(3, 3); }
+  get size() { return this._s; }
+  setFillColor(c) { this.c.fillStyle = c.css; } setStrokeColor(c) { this.c.strokeStyle = c.css; } setLineWidth(w) { this.c.lineWidth = w; this.c.lineCap = "round"; }
+  fillRect(r) { this.c.fillRect(r.x, r.y, r.width, r.height); }
+  fillEllipse(r) { this.c.beginPath(); this.c.ellipse(r.x + r.width / 2, r.y + r.height / 2, r.width / 2, r.height / 2, 0, 0, 7); this.c.fill(); }
+  strokeEllipse(r) { this.c.beginPath(); this.c.ellipse(r.x + r.width / 2, r.y + r.height / 2, r.width / 2, r.height / 2, 0, 0, 7); this.c.stroke(); }
+  addPath(p) { this.c.beginPath(); p.ops.forEach(o => o(this.c)); }
+  fillPath() { this.c.fill(); } strokePath() { this.c.stroke(); }
+  setFont(f) { this.font = f; } setTextColor(c) { this.tc = c.css; }
+  setTextAlignedLeft() { this.align = "left"; } setTextAlignedCenter() { this.align = "center"; } setTextAlignedRight() { this.align = "right"; }
+  _f() { this.c.font = `${this.font.w} ${this.font.s}px -apple-system, "PingFang TC"`; this.c.fillStyle = this.tc; this.c.textBaseline = "top"; }
+  drawText(t, p) { this._f(); this.c.textAlign = "left"; this.c.fillText(t, p.x, p.y); }
+  drawTextInRect(t, r) { this._f(); this.c.textAlign = this.align;
+    const x = this.align === "center" ? r.x + r.width / 2 : this.align === "right" ? r.x + r.width : r.x;
+    this.c.save(); this.c.beginPath(); this.c.rect(r.x, r.y, r.width, r.height); this.c.clip(); this.c.fillText(t, x, r.y); this.c.restore(); }
+  getImage() { return { src: this.cv.toDataURL(), size: this._s }; } }
+class WText { constructor(t) { this.text = t; this.font = Font.systemFont(15); this.textColor = new Color("#000"); this.lineLimit = 0; this.minimumScaleFactor = 1; this.align = "left"; }
+  centerAlignText() { this.align = "center"; } rightAlignText() { this.align = "right"; } leftAlignText() { this.align = "left"; } }
+// Live date text: shown as iOS would draw it at this moment.
+class WDate extends WText { constructor(d) { super(""); this.date = d; this.applyRelativeStyle(); }
+  applyRelativeStyle() { const m = Math.round(Math.abs(Date.now() - this.date) / 60000);
+    this.text = m < 60 ? m + " 分鐘" : Math.floor(m / 60) + " 小時 " + (m % 60) + " 分鐘"; }
+  applyTimerStyle() { const s = Math.max(0, Math.round((this.date - Date.now()) / 1000));
+    this.text = Math.floor(s / 3600) + ":" + String(Math.floor(s / 60) % 60).padStart(2, "0") + ":" + String(s % 60).padStart(2, "0"); }
+  applyOffsetStyle() {} applyTimeStyle() {} applyDateStyle() {} }
+class WImage { constructor(i) { this.img = i; this.imageSize = i.size; } leftAlignImage() {} centerAlignImage() {} rightAlignImage() {} }
+class WStack { constructor() { this.items = []; this.dir = "h"; this.center = false; this.pad = null; this.spacing = 0; }
+  addStack() { const s = new WStack(); this.items.push(s); return s; }
+  addText(t) { const x = new WText(String(t)); this.items.push(x); return x; }
+  addDate(d) { const x = new WDate(d); this.items.push(x); return x; }
+  addImage(i) { const x = new WImage(i); this.items.push(x); return x; }
+  addSpacer(n) { this.items.push({ spacer: n ?? null }); return {}; }
+  layoutVertically() { this.dir = "v"; } layoutHorizontally() { this.dir = "h"; }
+  centerAlignContent() { this.center = true; } topAlignContent() { this.center = false; } bottomAlignContent() {}
+  setPadding(t, l, b, r) { this.pad = [t, l, b, r]; } }
+class ListWidget extends WStack { constructor() { super(); this.dir = "v"; this.pad = [16, 16, 16, 16]; } presentLarge() {} presentMedium() {} presentSmall() {} }
+class DateFormatter { string(d) { const p = n => String(n).padStart(2, "0");
+  return (this.dateFormat || "").replace("M/d", (d.getMonth() + 1) + "/" + d.getDate()).replace("HH", p(d.getHours())).replace("mm", p(d.getMinutes())); } }
+Object.assign(window, { Color, Font, Size, Point, Rect, Path, DrawContext, ListWidget, DateFormatter });
+
+function render(st, el, isRoot) {
+  el.className = (el.className ? el.className + " " : "") + "stack " + (st.dir === "v" ? "v" : "h") + (st.center ? " center" : "");
+  if (st.dir === "v" && st.center) el.style.alignItems = "center";
+  if (st.pad) el.style.padding = st.pad.map(x => x + "px").join(" ");
+  if (st.backgroundColor) el.style.background = st.backgroundColor.css;
+  if (st.size) { if (st.size.width) { el.style.width = st.size.width + "px"; el.style.flexShrink = 0; }
+    if (st.size.height) el.style.height = st.size.height + "px"; }
+  if (st.spacing) el.style.gap = st.spacing + "px";
+  if (st.cornerRadius) el.style.borderRadius = st.cornerRadius + "px";
+  // WidgetKit: a stack holding a flexible spacer grows along its parent's cross axis too.
+  if (st.items.some(i => i.spacer === null)) el.style.alignSelf = "stretch";
+  if (isRoot && !st.items.some(i => i.spacer === null)) el.style.justifyContent = "center";
+  for (const it of st.items) {
+    if (it instanceof WStack) { const c = document.createElement("div"); render(it, c); el.appendChild(c); }
+    else if (it instanceof WText) { const c = document.createElement("div"); c.className = "t"; c.textContent = it.text;
+      c.style.fontSize = it.font.s + "px"; c.style.fontWeight = it.font.w; c.style.color = it.textColor.css; c.style.textAlign = it.align;
+      if (it.align === "center") c.style.alignSelf = "stretch";
+      if (it.align === "right") { c.style.flex = "1"; }
+      if (it.lineLimit !== 1) { c.classList.add("wrap"); if (it.lineLimit) c.style.webkitLineClamp = it.lineLimit; }
+      c.dataset.min = it.minimumScaleFactor; el.appendChild(c); }
+    else if (it instanceof WImage) { const c = document.createElement("img"); c.src = it.img.src;
+      c.style.width = it.imageSize.width + "px"; c.style.height = it.imageSize.height + "px"; el.appendChild(c); }
+    else { const c = document.createElement("div"); if (it.spacer === null) c.className = "flex";
+      else { c.style.flex = "0 0 " + it.spacer + "px"; } el.appendChild(c); }
+  }
+}
+function shrink(root) {
+  root.querySelectorAll(".t").forEach(t => { const min = +t.dataset.min || 1; let s = parseFloat(t.style.fontSize), base = s;
+    while (t.scrollWidth > t.clientWidth + 0.5 && s > base * min) { s -= 0.25; t.style.fontSize = s + "px"; } });
+}
+
+const src = await (await fetch("w.js?" + Date.now())).text();
+const data = await (await fetch(new URLSearchParams(location.search).get("data") || "claude-usage.json")).text();
+window.FileManager = { iCloud: () => ({ documentsDirectory: () => "/d", joinPath: (a, b) => a + "/" + b, fileExists: () => true,
+    downloadFileFromiCloud: async () => {}, readString: () => data }),
+  local: () => ({ cacheDirectory: () => "/c", joinPath: (a, b) => a + "/" + b, fileExists: () => false, readString: () => null, writeString() {} }) };
+window.Device = { screenSize: () => new Size(402, 874) };
+window.Script = { setWidget(w) { window.__w = w; }, complete() {} };
+const blob = URL.createObjectURL(new Blob([src], { type: "text/javascript" }));
+const pages = (new URLSearchParams(location.search).get("pages") || ",趣味,更多,狀態,寵物,額度").split(",");
+for (const p of pages) for (const fam of ["small", "medium", "large"]) {
+  window.config = { widgetFamily: fam, runsInWidget: true }; window.args = { widgetParameter: p };
+  await import(blob + "#" + p + fam);
+  const w = window.__w, [W, H] = SIZES[fam];
+  const cell = document.createElement("div"); cell.className = "cell";
+  const cap = document.createElement("div"); cap.className = "cap"; cap.textContent = (p || "用量") + " · " + fam;
+  const el = document.createElement("div"); el.className = "widget"; el.style.width = W + "px"; el.style.height = H + "px";
+  el.style.background = (w.backgroundColor || new Color("#fff")).css;
+  const inner = document.createElement("div"); inner.style.cssText = "width:100%;height:100%;box-sizing:border-box;display:flex;flex-direction:column";
+  render(w, inner, true); inner.style.padding = (w.pad || [16, 16, 16, 16]).map(x => x + "px").join(" ");
+  el.appendChild(inner); cell.append(cap, el); document.getElementById("grid").appendChild(cell);
+  shrink(inner);
+  const kids = [...inner.children].reduce((a, c) => a + c.getBoundingClientRect().height, 0);
+  if (inner.scrollHeight > H + 1 || kids > H - (w.pad ? w.pad[0] + w.pad[2] : 32) + 1) { el.classList.add("over"); cap.textContent += "  ⚠ 超出 " + Math.round(Math.max(inner.scrollHeight - H, kids - H + 24)) + "px"; }
+}
+document.title = "done";
+</script>

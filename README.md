@@ -1,0 +1,158 @@
+# Claude 用量小工具（iPhone 主畫面 × Mac）
+
+把 Mac 上 Claude Code（Claude Desktop 的 Code 分頁與終端機 CLI）的使用量、方案額度和 session 狀態，
+顯示在 iPhone 主畫面的小工具上。資料由 Mac 產生，經 iCloud 雲碟送到手機，不經過任何第三方伺服器。
+
+![小克的工作狀態頁](docs/images/5-pet.png)
+
+```
+Mac（每 5 分鐘）                       iCloud 雲碟                    iPhone
+~/.claude/projects 的使用紀錄  ─┐
+Claude Desktop 的 session 狀態 ─┼─▶ claude-usage.json ─▶ Scriptable 小工具（6 頁 × 3 尺寸）
+claude /usage 的方案額度       ─┤
+心跳（每分鐘）                  ─┘
+```
+
+## 快速開始
+
+1. 下載：`git clone` 這個 repo，或按 Code → Download ZIP 解壓縮。
+2. Mac：在資料夾裡執行 `bash install.sh`（或用下面那一句 Prompt 交給 Claude Code）。
+3. iPhone：安裝 Scriptable，加一個 Scriptable 小工具，Script 選「Claude Token 用量」，Parameter 填想看的頁面。
+
+## 一句 Prompt（交給 Claude Code 幫你裝或改）
+
+把整個資料夾放到 Mac 上，在這個資料夾開一個 Claude Code，貼上：
+
+> 請先讀這個資料夾的 README.md，幫我在這台 Mac 安裝 Claude 用量小工具（執行 install.sh，並先問我要不要插電不睡和心跳），確認 export.log 成功寫出 claude-usage.json，再一步步教我在 iPhone 用 Scriptable 加入小工具；之後我要改版面時，先用 tools/preview 預覽給我看，確認後再部署。
+
+## 會看到什麼
+
+小工具有六頁，用「參數」選頁（長按小工具 → 編輯小工具 → Parameter）。每頁都有小、中、大三種尺寸。
+
+| 參數 | 頁面 | 內容 |
+| --- | --- | --- |
+| （留空） | 用量 | 近 30 天實際使用、快取、今天、每日長條圖、5 小時與每週額度 |
+| 趣味 | 趣味統計 | 連續使用天數、最常用的時段、快取省下多少（依 API 定價估算）、最忙的一天 |
+| 更多 | 花絮 | 工具呼叫次數與排行、對話數、夜貓指數、最長的對話、換算成幾本書 |
+| 狀態 | 工作狀態 | 哪些 session 在執行、等你回答、有新回覆；心跳與額度 |
+| 寵物 | 小克 | 一隻跟著 session 狀態換表情的小寵物；體力＝5 小時額度、飽足＝今天用量、天線＝Remote Control |
+| 額度 | 方案額度 | 圓環儀表、即時倒數到重置、照目前速度重置前會用到多少 |
+
+以下是模擬圖（示範資料，非真實帳號；左到右是小、中、大尺寸）。實機字型寬度會略有不同。
+
+**用量**（參數留空）
+
+![用量頁](docs/images/1-usage.png)
+
+**趣味**
+
+![趣味頁](docs/images/2-fun.png)
+
+**更多**
+
+![更多頁](docs/images/3-more.png)
+
+**狀態**
+
+![狀態頁](docs/images/4-status.png)
+
+**寵物**：小克的心情跟著 session 狀態換——有人等你回應時舉手、有 session 在跑時冒汗、有新回覆時開心、深夜沒事時睡覺；
+頭上的天線亮綠燈代表 Remote Control 連著。
+
+![寵物頁](docs/images/5-pet.png)
+
+**額度**
+
+![額度頁](docs/images/6-limits.png)
+
+「幾分鐘前」與重置倒數由 iOS 即時跳動；其他數字在小工具刷新時更新（Mac 每 5 分鐘產生一次資料，
+iOS 自己決定多久刷新小工具，通常 5–30 分鐘）。用量、趣味、更多頁點一下會打開 Scriptable 立刻重抓；
+狀態、寵物、額度頁點一下會打開 Claude App（中、大尺寸點某個 session 會直接開那個 session）。
+
+## 需要
+
+- macOS，已用過 Claude Code（會有 `~/.claude/projects/`），有 `python3`。
+- iPhone 安裝 [Scriptable](https://apps.apple.com/app/scriptable/id1405459188)，Mac 與 iPhone 登入同一個 Apple 帳號並開啟 iCloud 雲碟。
+- 額度（5 小時、每週）需要 Mac 上有登入訂閱方案的 `claude` CLI（`~/.local/bin/claude`）；沒有的話這部分會改用 Claude Desktop 最後一筆紀錄或留空。
+- 「狀態」「寵物」頁的 session 資訊來自 Claude Desktop；只用終端機 CLI 的話這兩頁會比較空。
+
+## Mac 端安裝
+
+```bash
+bash install.sh
+```
+
+選項（可重複執行，改選項就重跑一次）：
+
+- `--no-keepawake`：不要讓 Mac 插電時保持清醒。預設會用 `caffeinate -s` 讓 Mac **只在插電時**不睡（螢幕照樣關），以免 Remote Control 斷線；用電池時照常睡眠。
+- `--no-heartbeat`：不要心跳。心跳每分鐘檢查 Claude Desktop 是否開著（沒開會在背景重新打開）、Remote Control 與網路。
+  想暫停自動重開，在 `~/.claude/token-usage/` 建一個 `heartbeat.pause` 檔案。
+
+安裝內容：
+
+| 位置 | 用途 |
+| --- | --- |
+| `~/.claude/token-usage/export_usage.py` | 每 5 分鐘讀本機 Claude Code 紀錄，寫 `usage-daily.csv`（帳本）與 iCloud 的 `claude-usage.json` |
+| `~/.claude/token-usage/heartbeat.py` | 每分鐘心跳，寫 `heartbeat.json` |
+| `~/Library/LaunchAgents/claude-usage-widget.*.plist` | 三個背景服務：`export`、`heartbeat`、`keepawake` |
+| iCloud `Scriptable/Claude Token 用量.js` | iPhone 小工具腳本 |
+
+立刻重跑一次匯出：
+
+```bash
+launchctl kickstart -k gui/$(id -u)/claude-usage-widget.export
+```
+
+> 注意：`claude-usage.json` 只能由背景服務寫。從終端機直接執行 `export_usage.py` 寫 iCloud 的檔案，
+> 之後背景服務可能永遠卡在開檔（macOS 對 iCloud 檔案的限制）。要手動測試請加
+> `USAGE_WIDGET_DIR=/tmp/某個資料夾` 寫到別處。
+
+## iPhone 端
+
+1. 打開 Scriptable，等「Claude Token 用量」出現在腳本清單（iCloud 同步可能要一兩分鐘）。點一下執行，可預覽每一頁。
+2. 長按主畫面空白處 → 左上「＋」→ 搜尋 Scriptable → 選尺寸 → 加入。
+3. 長按新的小工具 → 編輯小工具：Script 選「Claude Token 用量」，Parameter 填上表的參數（留空是用量頁）。
+4. 想多頁，就加多個小工具，或疊成「智慧型堆疊」上下滑。
+
+選用：讓資料更常更新——「捷徑」→ 自動化 →「＋」→ App → 選常開的 App、勾「已關閉」、「立即執行」→
+動作加 Scriptable 的「Run Script」選「Claude Token 用量」。從捷徑執行時不會跳選單，只會更新手機上的資料。
+
+## 修改
+
+- 版面都在 `ios/Claude Token 用量.js`，每一頁是一個函式：`usagePage`、`funPage`、`morePage`、`statusPage`、`petPage`、`limitsPage`。
+  大尺寸用 `BIG` 與 `S(小, 大)` 切換字級；`contentWidth()` 依 iPhone 寬度算內容寬（內容超過實際寬度時，iOS 會把整列字縮小）。
+- 資料欄位在 Mac 的 `export_usage.py` 最後組成 `summary`；加欄位後小工具才讀得到。
+- 預覽：不用 iPhone 也能看版面。
+
+  ```bash
+  cp "ios/Claude Token 用量.js" tools/preview/w.js
+  cd tools/preview && python3 -m http.server 8765
+  ```
+
+  用瀏覽器開 `http://127.0.0.1:8765/?data=sample.json`（示範資料），一次看 6 頁 × 3 尺寸；
+  `&pages=狀態,寵物` 只看指定頁。想看自己的資料，把 iCloud 的 `claude-usage.json` 複製到 `tools/preview/`，網址拿掉 `?data=sample.json`。
+  超出邊框的會標紅框。預覽器的尺寸是在 402pt 寬的 iPhone 量的（中、大 360pt 寬，大尺寸 359pt 高），
+  實機字寬會略有差異，最後以手機為準。
+- 改完把 `.js` 覆蓋到 iCloud 的 Scriptable 資料夾（或貼進 Scriptable），在 Scriptable 裡執行一次即生效。
+
+## 資料與隱私
+
+- 只讀本機檔案：`~/.claude/projects/**/*.jsonl`（token 數、時間、工具名稱、專案資料夾名稱）、
+  Claude Desktop 的 session 紀錄（標題、狀態）與 `remote-control-state.json`。**不讀對話內容。**
+- 會寫進你自己 iCloud 的內容：用量數字、專案資料夾名稱、session 標題與它們的 Remote Control 連結。
+  若標題或專案名稱敏感，分享截圖前請留意。
+- 額度由 `claude -p /usage --no-session-persistence` 取得；程式本身不讀取任何登入憑證，也不呼叫模型、不花 token。
+- 「快取省下」與金額依公開 API 定價估算，不是你的實際帳單。Claude Desktop 一般聊天不在本機紀錄裡，不會被計入。
+- Claude Desktop 的 session 檔是 App 內部格式，App 改版後「狀態」「寵物」頁可能失效；其他頁不受影響。
+
+## 移除
+
+```bash
+bash uninstall.sh
+```
+
+再到 iPhone 刪除小工具與 Scriptable 腳本；不要的資料刪 `~/.claude/token-usage/`。
+
+## 授權
+
+MIT License，歡迎自由使用與修改。本專案與 Anthropic 無關；「小克」是原創角色。
