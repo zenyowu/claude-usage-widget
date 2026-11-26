@@ -26,7 +26,7 @@ const C = {
 };
 
 // ---------- 設定（存在 iCloud 的 Scriptable 資料夾，App 與小工具共用；在 App 裡執行腳本即可修改） ----------
-const VERSION = "2026.11.27.2";
+const VERSION = "2026.11.27.3";
 const REPO = "zeuikli/claude-usage-widget";
 const SETTINGS_PATH = fm.joinPath(fm.documentsDirectory(), "claude-usage-settings.json");
 const STATE_PATH = fm.joinPath(fm.documentsDirectory(), "claude-usage-state.json");
@@ -214,8 +214,11 @@ function tiles(w, items, width, valueSize) {
 function oldData(w, title, d, msg) {
   header(w, d, title);
   w.addSpacer(8);
-  label(w, msg || "資料還是舊版", 13, C.text, "bold");
-  label(w, "等 Mac 下一次更新（每 5 分鐘）後就會出現。", 10, C.dim).lineLimit = 3;
+  label(w, msg || "這份資料還沒有這一頁", 13, C.text, "bold");
+  // Say which copy the phone has, so it is clear the phone is behind (not the Mac).
+  const t = label(w, "手機上的資料是 " + (d ? shortTime(d.generated) : "舊的") + " 產生的，早於這一頁上線。Mac 每 5 分鐘更新；" +
+    "點一下小工具會打開 Scriptable 重新讀取，回到主畫面就會出現。", 10, C.dim);
+  t.lineLimit = 4;
   w.addSpacer();
 }
 
