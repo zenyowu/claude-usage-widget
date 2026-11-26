@@ -172,6 +172,10 @@ bash uninstall.sh
 
 再到 iPhone 刪除小工具與 Scriptable 腳本；不要的資料刪 `~/.claude/token-usage/`。
 
+## 更新紀錄
+
+見 [CHANGELOG.md](CHANGELOG.md)。
+
 ## 授權
 
 MIT License，歡迎自由使用與修改。本專案與 Anthropic 無關；「小克」是原創角色。
