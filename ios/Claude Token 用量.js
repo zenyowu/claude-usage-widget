@@ -26,7 +26,7 @@ const C = {
 };
 
 // ---------- 設定（存在 iCloud 的 Scriptable 資料夾，App 與小工具共用；在 App 裡執行腳本即可修改） ----------
-const VERSION = "2026.11.27.1";
+const VERSION = "2026.11.27.2";
 const REPO = "zeuikli/claude-usage-widget";
 const SETTINGS_PATH = fm.joinPath(fm.documentsDirectory(), "claude-usage-settings.json");
 const STATE_PATH = fm.joinPath(fm.documentsDirectory(), "claude-usage-state.json");
@@ -1238,6 +1238,51 @@ function insightPage(w, d, family) {
   tile(g2, "Claude Code 版本", v.length ? v[2] + " 個" : "—", v.length ? v[0] + " → " + v[1] : "", C.actual, tw, 18);
 }
 
+// ---- 速度：各模型 tok/s（近 30 天中位數） ----
+// speed rows: [model, replies, end-to-end, generation, time to first token (s), thinking, tool input]
+function speedPage(w, d, family) {
+  const sp = ((d.insights || {}).speed || []).filter(x => x[3]);
+  if (!sp.length) return oldData(w, "Claude 速度", d);
+  const main = sp[0], fastest = sp.slice().sort((a, b) => b[3] - a[3])[0];
+  const tps = n => n === null || n === undefined ? "—" : Math.round(n) + "";
+  if (family === "small") {
+    header(w, d, "速度");
+    w.addSpacer(6);
+    label(w, modelName(main[0]) + " 生成", 10, C.actual, "bold");
+    const r = w.addStack();
+    r.centerAlignContent();
+    label(r, tps(main[3]), 28, C.text, "round");
+    r.addSpacer(3);
+    label(r, "tok/s", 11, C.dim, "bold");
+    label(w, "等第一個字 " + main[4] + " 秒", 9, C.dim);
+    w.addSpacer();
+    label(w, "最快：" + modelName(fastest[0]) + " " + tps(fastest[3]), 10, C.text);
+    return;
+  }
+  const cw = contentWidth();
+  header(w, d, "Claude 速度");
+  w.addSpacer(family === "large" ? 10 : 6);
+  if (family === "large") {
+    tiles(w, [
+      ["最常用・" + modelName(main[0]), tps(main[3]) + " tok/s", num(main[1]) + " 次回覆", C.actual],
+      ["最快・" + modelName(fastest[0]), tps(fastest[3]) + " tok/s", "生成速度", C.good],
+      ["等第一個字", main[4] + " 秒", modelName(main[0]) + " 中位數", C.cache],
+    ], cw, 20);
+    w.addSpacer(14);
+    label(w, "生成速度（tok/s，扣掉等第一個字的時間）", 12, C.dim, "bold");
+    w.addSpacer(6);
+  }
+  const n = family === "large" ? 5 : 4, rh = family === "large" ? 22 : 21;
+  const list = sp.slice(0, n).map(x => [modelName(x[0]), x[3]]);
+  addImg(w, rankBars(list, cw, rh, family === "large" ? 96 : 90, v => Math.round(v) + "", family === "large" ? 12 : 11), cw, rh * list.length);
+  if (family === "medium") { w.addSpacer(); label(w, "中位數・近 30 天・tok/s", 9, C.dim); return; }
+  w.addSpacer();
+  sp.slice(0, 2).forEach(x => {
+    label(w, modelName(x[0]) + "　思考 " + tps(x[5]) + "・工具輸入 " + tps(x[6]) + "・含等待 " + tps(x[2]) + " tok/s", 11, C.dim);
+    w.addSpacer(3);
+  });
+}
+
 // ---------- 通知、提醒事項、行事曆、版本檢查（每次腳本執行時順便做；任何一項失敗都不影響小工具） ----------
 async function notify(id, title, body, opts) {
   const n = new Notification();
@@ -1417,9 +1462,10 @@ async function settingsPage(data) {
 }
 
 // ---------- 主程式 ----------
-const PAGES = [["用量", usagePage], ["趣味", funPage], ["更多", morePage], ["狀態", statusPage], ["寵物", petPage], ["額度", limitsPage], ["日曆", calendarPage], ["洞察", insightPage]];
+const PAGES = [["用量", usagePage], ["趣味", funPage], ["更多", morePage], ["狀態", statusPage], ["寵物", petPage], ["額度", limitsPage], ["日曆", calendarPage], ["洞察", insightPage], ["速度", speedPage]];
 function pickPage(param) {
   const p = String(param || "").replace(/\s+/g, "").toLowerCase();
+  if (p.includes("速度") || p.includes("speed")) return speedPage;
   if (p.includes("洞察") || p.includes("insight")) return insightPage;
   if (p.includes("日曆") || p.includes("calendar")) return calendarPage;
   if (p.includes("額度") || p.includes("limit")) return limitsPage;

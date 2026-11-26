@@ -83,11 +83,49 @@ def note_other(d, t):
         ins["prompts"] += 1
 
 
+# Speed per model (last 30 days). A reply's clock starts at the line it answers (its parent: your prompt or a tool
+# result) and stops at its last line. Time to first token = until the first line, minus the thinking time Claude Code
+# records; "generation" = output tokens / the rest. Thinking and tool-input speeds use the durations Claude Code logs.
+speed = defaultdict(lambda: {"e2e": [], "gen": [], "ttft": [], "think": [], "tool": []})
+uuid_re, ts_re = re.compile(r'"uuid":"([^"]+)"'), re.compile(r'"timestamp":"([^"]+)"')
+
+
+def iso_s(x):
+    return datetime.datetime.fromisoformat(x.replace("Z", "+00:00")).timestamp()
+
+
+def add_speeds(reps, uuid_ts):
+    for r in reps.values():
+        pts = uuid_ts.get(r["parent"])
+        if not pts:
+            continue
+        t0, first, last = iso_s(pts), min(r["ts"]), max(r["ts"])
+        dur = last - t0
+        if r["out"] < 200 or not 1 <= dur <= 600:
+            continue
+        s = speed[r["model"]]
+        s["e2e"].append(r["out"] / dur)
+        ttft = (first - t0) - r["think_ms"] / 1000
+        if 0 < ttft < 60:
+            s["ttft"].append(ttft)
+            if dur - ttft > 0.5:
+                s["gen"].append(r["out"] / (dur - ttft))
+        if r["think_ms"] > 500 and r["think"] > 50:
+            s["think"].append(r["think"] / (r["think_ms"] / 1000))
+        if r["tool_ms"] > 500 and r["out"] - r["think"] > 100:
+            s["tool"].append((r["out"] - r["think"]) / (r["tool_ms"] / 1000))
+
+
 for path in glob.glob(root + "/**/*.jsonl", recursive=True):
     if os.path.getmtime(path) < since.timestamp():
         continue
+    uuid_ts, reps = {}, {}
     with open(path, errors="ignore") as f:
         for line in f:
+            if '"uuid":"' in line:  # cheap: every line's time, so a reply can find when its parent was written
+                mu, mt = uuid_re.search(line), ts_re.search(line)
+                if mu and mt:
+                    uuid_ts[mu.group(1)] = mt.group(1)
             other = '"type":"user"' in line or '"type":"system"' in line
             if '"usage"' not in line and not other:
                 continue
@@ -123,6 +161,14 @@ for path in glob.glob(root + "/**/*.jsonl", recursive=True):
                 if d.get("thinkingDurationMs"):
                     think_ms.append(int(d["thinkingDurationMs"]))
             key = (m.get("id"), d.get("requestId"))
+            if t >= start30:  # every line of the reply, before the dedup below
+                r_ = reps.setdefault(key, {"model": m["model"], "parent": d.get("parentUuid"), "ts": [], "out": 0,
+                                          "think": 0, "think_ms": 0, "tool_ms": 0})
+                r_["ts"].append(t.timestamp())
+                r_["out"] = max(r_["out"], int(u.get("output_tokens") or 0))
+                r_["think"] = max(r_["think"], int((u.get("output_tokens_details") or {}).get("thinking_tokens") or 0))
+                r_["think_ms"] += int(d.get("thinkingDurationMs") or 0)
+                r_["tool_ms"] += int(d.get("toolInputStreamMs") or 0)
             if key in seen:
                 continue
             seen.add(key)
@@ -168,6 +214,7 @@ for path in glob.glob(root + "/**/*.jsonl", recursive=True):
                     cost[1] += ((v[0] + v[2] + v[3]) * pin + v[1] * pout) / 1e6
                 else:
                     unpriced.add(m["model"])
+    add_speeds(reps, uuid_ts)
 # Claude Code deletes transcripts after cleanupPeriodDays (30 by default), so the CSV doubles as a ledger:
 # a day already counted keeps its larger value instead of shrinking when its transcripts are cleaned up.
 if os.path.exists(out):
@@ -404,7 +451,11 @@ if os.path.isdir(widget_dir):
                          sub_models=sorted(sub_models.items(), key=lambda kv: -kv[1])[:5],
                          versions=[min(versions, key=lambda v: [int(x) for x in v.split(".") if x.isdigit()]),
                                    max(versions, key=lambda v: [int(x) for x in v.split(".") if x.isdigit()]), len(versions)]
-                         if versions else [], branches=len(branches)),
+                         if versions else [], branches=len(branches),
+                         # [model, replies, end-to-end, generation, time to first token (s), thinking, tool input] — medians
+                         speed=sorted(([k, len(v["e2e"])] + [round(sorted(v[x])[len(v[x]) // 2], 1) if v[x] else None
+                                                              for x in ("e2e", "gen", "ttft", "think", "tool")]
+                                       for k, v in speed.items() if len(v["e2e"]) >= 30), key=lambda x: -x[1])),
         "live": live_sessions(), "remote_sessions": remote[0], "limits": plan_limits(),
         "heartbeat": read_heartbeat()})
     # Written in place by the LaunchAgent. Under launchd, opening or renaming onto an iCloud Drive file
