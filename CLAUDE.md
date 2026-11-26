@@ -85,6 +85,7 @@ launchctl kickstart -k gui/$(id -u)/claude-usage-widget.export
 | 小工具右上角時間變橘色 | 超過 90 分鐘沒更新：Mac 睡著、關機，或 iCloud 延遲 |
 | 額度頁「這次沒讀到額度」 | 沒有登入訂閱方案的 `claude` CLI；請使用者在終端機執行 `claude` 登入一次 |
 | 「狀態」「寵物」頁是空的 | 只用終端機 CLI、沒用 Claude Desktop 時正常 |
+| 通知沒跳出來 | Scriptable 開在前景時 iOS 不跳橫幅（測試通知已改成 5 秒後送出）；開著專注模式時通知會收進「專注模式期間」，請使用者把 Scriptable 加進該專注模式允許的 App。設定頁「查看已排定與已送出的通知」可確認有沒有排上 |
 | 要移除 | `bash uninstall.sh`，再請使用者在 iPhone 刪掉小工具與腳本 |
 
 ## 發布新版時（維護者）
