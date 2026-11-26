@@ -291,6 +291,12 @@ def live_sessions():
 widget_dir = os.path.expanduser(os.environ.get(
     "USAGE_WIDGET_DIR", "~/Library/Mobile Documents/iCloud~dk~simonbs~Scriptable/Documents"))
 if os.path.isdir(widget_dir):
+    # If Scriptable was set up after install.sh ran, put the widget script there now (install.sh keeps a copy here).
+    script_src = os.path.join(os.path.dirname(os.path.abspath(__file__)), "Claude Token 用量.js")
+    script_dst = os.path.join(widget_dir, "Claude Token 用量.js")
+    if os.path.exists(script_src) and not os.path.exists(script_dst):
+        import shutil
+        shutil.copyfile(script_src, script_dst)
     today = now.date()
     def total(lo, hi):
         t = [0, 0, 0, 0, 0]

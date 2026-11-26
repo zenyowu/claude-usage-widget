@@ -26,7 +26,7 @@ PY="$(command -v python3 || true)"
 [ -d "$HOME/.claude/projects" ] || echo "提醒：還沒有 ~/.claude/projects，用過 Claude Code 之後才會有資料。"
 
 mkdir -p "$DEST" "$AGENTS"
-cp "$HERE/mac/export_usage.py" "$HERE/mac/heartbeat.py" "$DEST/"
+cp "$HERE/mac/export_usage.py" "$HERE/mac/heartbeat.py" "$HERE/ios/Claude Token 用量.js" "$DEST/"
 mkdir -p "$DEST/preview" && cp "$HERE/tools/preview/index.html" "$DEST/preview/"
 
 # 小工具腳本放進 Scriptable 的 iCloud 資料夾（要先在 iPhone 裝 Scriptable 並開過一次）。
@@ -34,8 +34,8 @@ if [ -d "$SCRIPTABLE" ]; then
   cp "$HERE/ios/Claude Token 用量.js" "$SCRIPTABLE/"
   echo "已把小工具腳本放進 Scriptable 的 iCloud 資料夾。"
 else
-  echo "找不到 Scriptable 的 iCloud 資料夾：請在 iPhone 安裝 Scriptable、打開一次並允許 iCloud，再重跑本腳本；"
-  echo "或手動把 ios/Claude Token 用量.js 的內容貼進 Scriptable 的新腳本。"
+  echo "還沒有 Scriptable 的 iCloud 資料夾：請在 iPhone 安裝 Scriptable、打開一次並允許 iCloud。"
+  echo "資料夾出現後，背景匯出會在 5 分鐘內自動放好小工具腳本，不用重跑本腳本。"
 fi
 
 plist() {  # name, interval(0 = keep running), program args...

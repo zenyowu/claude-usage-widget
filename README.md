@@ -13,17 +13,22 @@ claude /usage 的方案額度       ─┤
 心跳（每分鐘）                  ─┘
 ```
 
-## 快速開始
+## 交給 Claude 自動設定（推薦）
 
-1. 下載：`git clone` 這個 repo，或按 Code → Download ZIP 解壓縮。
-2. Mac：在資料夾裡執行 `bash install.sh`（或用下面那一句 Prompt 交給 Claude Code）。
+在 Mac 打開 **Claude Code**（Claude Desktop 的 Code 分頁或終端機 `claude`），貼上這一句：
+
+> 請幫我安裝 https://github.com/zeuikli/claude-usage-widget 這個 iPhone 小工具：照 repo 裡 CLAUDE.md 的步驟在這台 Mac 設定好、跑 doctor.sh 驗證，再帶我完成 iPhone 上的步驟。
+
+Claude 會：檢查環境 → 問你兩個選項（插電時是否保持清醒、是否要心跳）→ 安裝 → 用 `doctor.sh` 驗證 →
+告訴你 iPhone 上剩下的 4 步（安裝 Scriptable、加小工具、選腳本、填參數）。iPhone 的部分 Apple 不允許程式代勞，需要你自己點。
+
+之後想改版面，也可以直接跟 Claude 說，例如「把小克改成藍色」「大尺寸用量頁加一張快取圖」——它會先用預覽器給你看，確認後再更新到手機。
+
+## 手動安裝（不用 Claude 也可以）
+
+1. 下載：`git clone https://github.com/zeuikli/claude-usage-widget`，或按 Code → Download ZIP 解壓縮。
+2. Mac：在資料夾裡依序執行 `bash doctor.sh --pre`、`bash install.sh`、`bash doctor.sh --wait`（全部 `[OK]` 就完成）。
 3. iPhone：安裝 Scriptable，加一個 Scriptable 小工具，Script 選「Claude Token 用量」，Parameter 填想看的頁面。
-
-## 一句 Prompt（交給 Claude Code 幫你裝或改）
-
-把整個資料夾放到 Mac 上，在這個資料夾開一個 Claude Code，貼上：
-
-> 請先讀這個資料夾的 README.md，幫我在這台 Mac 安裝 Claude 用量小工具（執行 install.sh，並先問我要不要插電不睡和心跳），確認 export.log 成功寫出 claude-usage.json，再一步步教我在 iPhone 用 Scriptable 加入小工具；之後我要改版面時，先用 tools/preview 預覽給我看，確認後再部署。
 
 ## 會看到什麼
 
@@ -107,6 +112,7 @@ bash install.sh
 | --- | --- |
 | `~/.claude/token-usage/export_usage.py` | 每 5 分鐘讀本機 Claude Code 紀錄，寫 `usage-daily.csv`（帳本）與 iCloud 的 `claude-usage.json` |
 | `~/.claude/token-usage/heartbeat.py` | 每分鐘心跳，寫 `heartbeat.json` |
+| `doctor.sh` | 健檢：安裝前後都能跑，逐項列出 `[OK]`／`[!!]`／`[--]` 與修法 |
 | `~/Library/LaunchAgents/claude-usage-widget.*.plist` | 三個背景服務：`export`、`heartbeat`、`keepawake` |
 | iCloud `Scriptable/Claude Token 用量.js` | iPhone 小工具腳本 |
 
@@ -122,7 +128,7 @@ launchctl kickstart -k gui/$(id -u)/claude-usage-widget.export
 
 ## iPhone 端
 
-1. 打開 Scriptable，等「Claude Token 用量」出現在腳本清單（iCloud 同步可能要一兩分鐘）。點一下執行，可預覽每一頁。
+1. 打開 Scriptable，等「Claude Token 用量」出現在腳本清單（iCloud 同步可能要一兩分鐘；如果安裝 Mac 端時還沒裝 Scriptable，背景匯出會在 5 分鐘內自動補上腳本）。點一下執行，可預覽每一頁。
 2. 長按主畫面空白處 → 左上「＋」→ 搜尋 Scriptable → 選尺寸 → 加入。
 3. 長按新的小工具 → 編輯小工具：Script 選「Claude Token 用量」，Parameter 填上表的參數（留空是用量頁）。
 4. 想多頁，就加多個小工具，或疊成「智慧型堆疊」上下滑。
