@@ -3,7 +3,7 @@
 把 Mac 上 Claude Code（Claude Desktop 的 Code 分頁與終端機 CLI）的使用量、方案額度和 session 狀態，
 顯示在 iPhone 主畫面的小工具上。資料由 Mac 產生，經 iCloud 雲碟送到手機，不經過任何第三方伺服器。
 
-![小克的工作狀態頁](docs/images/5-pet.png)
+<img src="docs/images/widgets/5-pet-large.png" width="360" alt="小克的工作狀態頁">
 
 ```
 Mac（每 5 分鐘）                       iCloud 雲碟                    iPhone
@@ -38,32 +38,45 @@ claude /usage 的方案額度       ─┤
 | 寵物 | 小克 | 一隻跟著 session 狀態換表情的小寵物；體力＝5 小時額度、飽足＝今天用量、天線＝Remote Control |
 | 額度 | 方案額度 | 圓環儀表、即時倒數到重置、照目前速度重置前會用到多少 |
 
-以下是模擬圖（示範資料，非真實帳號；左到右是小、中、大尺寸）。實機字型寬度會略有不同。
+以下是 6 頁 × 3 種尺寸的模擬圖（示範資料，非真實帳號）。實機字型寬度會略有不同。
 
-**用量**（參數留空）
+### 用量（參數留空）
 
-![用量頁](docs/images/1-usage.png)
+| 小 | 中 | 大 |
+| :-: | :-: | :-: |
+| <img src="docs/images/widgets/1-usage-small.png" width="170" alt="用量・小"> | <img src="docs/images/widgets/1-usage-medium.png" width="340" alt="用量・中"> | <img src="docs/images/widgets/1-usage-large.png" width="340" alt="用量・大"> |
 
-**趣味**
+### 趣味
 
-![趣味頁](docs/images/2-fun.png)
+| 小 | 中 | 大 |
+| :-: | :-: | :-: |
+| <img src="docs/images/widgets/2-fun-small.png" width="170" alt="趣味・小"> | <img src="docs/images/widgets/2-fun-medium.png" width="340" alt="趣味・中"> | <img src="docs/images/widgets/2-fun-large.png" width="340" alt="趣味・大"> |
 
-**更多**
+### 更多
 
-![更多頁](docs/images/3-more.png)
+| 小 | 中 | 大 |
+| :-: | :-: | :-: |
+| <img src="docs/images/widgets/3-more-small.png" width="170" alt="更多・小"> | <img src="docs/images/widgets/3-more-medium.png" width="340" alt="更多・中"> | <img src="docs/images/widgets/3-more-large.png" width="340" alt="更多・大"> |
 
-**狀態**
+### 狀態
 
-![狀態頁](docs/images/4-status.png)
+| 小 | 中 | 大 |
+| :-: | :-: | :-: |
+| <img src="docs/images/widgets/4-status-small.png" width="170" alt="狀態・小"> | <img src="docs/images/widgets/4-status-medium.png" width="340" alt="狀態・中"> | <img src="docs/images/widgets/4-status-large.png" width="340" alt="狀態・大"> |
 
-**寵物**：小克的心情跟著 session 狀態換——有人等你回應時舉手、有 session 在跑時冒汗、有新回覆時開心、深夜沒事時睡覺；
-頭上的天線亮綠燈代表 Remote Control 連著。
+### 寵物
 
-![寵物頁](docs/images/5-pet.png)
+小克的心情跟著 session 狀態換——有人等你回應時舉手、有 session 在跑時冒汗、有新回覆時開心、深夜沒事時睡覺；頭上的天線亮綠燈代表 Remote Control 連著。
 
-**額度**
+| 小 | 中 | 大 |
+| :-: | :-: | :-: |
+| <img src="docs/images/widgets/5-pet-small.png" width="170" alt="寵物・小"> | <img src="docs/images/widgets/5-pet-medium.png" width="340" alt="寵物・中"> | <img src="docs/images/widgets/5-pet-large.png" width="340" alt="寵物・大"> |
 
-![額度頁](docs/images/6-limits.png)
+### 額度
+
+| 小 | 中 | 大 |
+| :-: | :-: | :-: |
+| <img src="docs/images/widgets/6-limits-small.png" width="170" alt="額度・小"> | <img src="docs/images/widgets/6-limits-medium.png" width="340" alt="額度・中"> | <img src="docs/images/widgets/6-limits-large.png" width="340" alt="額度・大"> |
 
 「幾分鐘前」與重置倒數由 iOS 即時跳動；其他數字在小工具刷新時更新（Mac 每 5 分鐘產生一次資料，
 iOS 自己決定多久刷新小工具，通常 5–30 分鐘）。用量、趣味、更多頁點一下會打開 Scriptable 立刻重抓；
@@ -130,7 +143,7 @@ launchctl kickstart -k gui/$(id -u)/claude-usage-widget.export
   ```
 
   用瀏覽器開 `http://127.0.0.1:8765/?data=sample.json`（示範資料），一次看 6 頁 × 3 尺寸；
-  `&pages=狀態,寵物` 只看指定頁。想看自己的資料，把 iCloud 的 `claude-usage.json` 複製到 `tools/preview/`，網址拿掉 `?data=sample.json`。
+  `&pages=狀態,寵物` 只看指定頁；`&pages=寵物&only=large&shot=1` 只畫一個小工具（README 的圖就是這樣截的）。想看自己的資料，把 iCloud 的 `claude-usage.json` 複製到 `tools/preview/`，網址拿掉 `?data=sample.json`。
   超出邊框的會標紅框。預覽器的尺寸是在 402pt 寬的 iPhone 量的（中、大 360pt 寬，大尺寸 359pt 高），
   實機字寬會略有差異，最後以手機為準。
 - 改完把 `.js` 覆蓋到 iCloud 的 Scriptable 資料夾（或貼進 Scriptable），在 Scriptable 裡執行一次即生效。
