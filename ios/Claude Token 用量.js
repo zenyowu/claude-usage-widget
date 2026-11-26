@@ -26,7 +26,7 @@ const C = {
 };
 
 // ---------- 設定（存在 iCloud 的 Scriptable 資料夾，App 與小工具共用；在 App 裡執行腳本即可修改） ----------
-const VERSION = "2026.11.27";
+const VERSION = "2026.11.27.1";
 const REPO = "zeuikli/claude-usage-widget";
 const SETTINGS_PATH = fm.joinPath(fm.documentsDirectory(), "claude-usage-settings.json");
 const STATE_PATH = fm.joinPath(fm.documentsDirectory(), "claude-usage-state.json");
@@ -1340,6 +1340,13 @@ async function selfUpdate() {
 }
 
 // ---------- App 裡的設定頁 ----------
+async function info(title, message) {
+  const a = new Alert();
+  a.title = title;
+  a.message = message;
+  a.addAction("好");
+  await a.present();
+}
 async function settingsPage(data) {
   const t = new UITable();
   t.showSeparators = true;
@@ -1373,7 +1380,22 @@ async function settingsPage(data) {
     action("　門檻：" + SETTINGS.highAt + "%（點一下切換 70／80／90）", null, () => {
       SETTINGS.highAt = SETTINGS.highAt >= 90 ? 70 : SETTINGS.highAt + 10; save(); });
     toggle("notifyWaiting", "有 session 等你回應時通知", "小工具刷新時才會發現，可能晚幾分鐘");
-    action("送一則測試通知", null, () => notify("claude-test", "Claude 用量小工具", "通知正常運作。", {}));
+    // iOS usually shows no banner for an app that is open in front, so the test fires 5 s later:
+    // schedule it, then go to the Home Screen or lock the phone.
+    action("送一則測試通知（5 秒後）", "按下後回到主畫面或鎖定螢幕", async () => {
+      try {
+        await notify("claude-test", "Claude 用量小工具", "通知正常運作。", { at: new Date(Date.now() + 5000) });
+        await info("已排定測試通知", "5 秒後送出。請現在回到主畫面或鎖定螢幕；App 開在前景時 iOS 通常不會跳出橫幅。");
+      } catch (e) { await info("排定失敗", String(e)); }
+    });
+    action("查看已排定與已送出的通知", "確認通知有沒有排上", async () => {
+      try {
+        const pending = await Notification.allPending(), delivered = await Notification.allDelivered();
+        const line = n => "・" + n.title + (n.nextTriggerDate ? "（" + shortTime(n.nextTriggerDate.toISOString()) + "）" : "");
+        await info("通知", "已排定 " + pending.length + " 則\n" + pending.map(line).join("\n") +
+          "\n\n通知中心裡還有 " + delivered.length + " 則\n" + delivered.slice(0, 5).map(line).join("\n"));
+      } catch (e) { await info("讀取失敗", String(e)); }
+    });
     header("外觀");
     toggle("transparent", "透明背景", "顯示桌布（iOS 27.2 以上才有效）");
     action("主題：" + ({ default: "預設", warm: "暖橘漸層", night: "夜空" }[SETTINGS.theme] || "預設") + "（點一下切換）", null, () => {
