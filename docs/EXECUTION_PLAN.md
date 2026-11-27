@@ -11,6 +11,14 @@
 > the production path; (5) ntfy ACL + high-entropy topic are mandatory; (6) `limits[].percent`
 > means **used** 0–100; add `stale_after_seconds`; prefer per-provider `collected_at`; keep
 > notify fingerprints off the public JSON when possible.
+>
+> **agy local review (2026-11-27, agy 1.5.18):** Confirmed binary path and
+> `agy -p /usage --output-format json` (also `/quota`). Parse `command.data.groups[].buckets[]`;
+> map epoch `reset_time` `1970-01-01T00:00:00Z` → `resets: null`; version via `agy --version`
+> (not PE FileVersionInfo); prefer `--print-timeout 20s`; require SUCCESS + `num_turns==0`.
+> `~\.gemini\antigravity\` is still active (not legacy); `antigravity-ide\conversations` absent
+> after migration. Prefer one logged-in-user watchdog; rate-limit with `CF-Connecting-IP`;
+> verify ntfy ACL tier before M3a. See `docs/AGY_REVIEW.md`.
 
 ---
 
@@ -206,15 +214,17 @@ Use top-level `stale_after_seconds` (default **1200**). If `now - generated` exc
 **Limits (scriptable path — peer-reviewed):**
 
 - Binary: `%LOCALAPPDATA%\agy\bin\agy.exe` (or `Get-Command agy`).
-- **Require** a minimum CLI version that supports print-mode slash commands (community: **≥ 1.1.11**). Below that → `status: missing` / `unsupported_agy_version`, do not run.
-- Headless: `agy -p /usage --output-format json` (alias `/quota`). **Never** drive the interactive TUI from Task Scheduler.
-- Reject responses that look like a real agent turn (e.g. non-zero model turns) — older CLIs can burn quota if slash commands are disabled.
-- Parse groups into multiple `limits[]` rows (`window`: `5h` | `weekly`; separate model pools). Convert remaining fractions → **used** `percent`.
-- Settings / auth (do not log): `%USERPROFILE%\.gemini\antigravity-cli\`; Windows Credential Manager service `gemini` / account `antigravity` (version-dependent).
+- **Require** CLI **≥ 1.1.11** via `agy --version` text (PE `FileVersionInfo` may be empty). Below that → `status: missing` / `unsupported_agy_version`, do not run.
+- Headless: `agy -p /usage --output-format json` (alias `/quota`; prefer `--print-timeout 20s`). **Never** drive the interactive TUI from Task Scheduler.
+- Accept only payloads with `status == SUCCESS`, `command.name == "usage"`, `num_turns == 0`, `usage.total_tokens == 0`, empty `conversation_id`. Otherwise treat as error (may have burned a real turn).
+- Parse `command.data.groups[].buckets[]` (`id` e.g. `gemini-weekly`, `3p-5h`; `window` `weekly`|`5h`; `remaining_fraction`; `reset_time`). Convert to **used** `percent = round((1 - remaining_fraction) * 100)` clamped 0–100. Optional `limits[].group` from group name (`Gemini Models` / `Claude and GPT models`).
+- If `reset_time` is `1970-01-01T00:00:00Z` (unused bucket sentinel observed on host) → `resets: null`.
+- Settings / auth (do not log): `%USERPROFILE%\.gemini\antigravity-cli\`; Credential Manager `gemini:antigravity`.
 
 **Activity / live tasks (experimental):**
 
-- Probe paths: `%USERPROFILE%\.gemini\antigravity-cli\conversations`, `antigravity-ide\conversations`, legacy `antigravity\`; IDE DB `%APPDATA%\Antigravity IDE\User\globalStorage\state.vscdb`.
+- Probe: `%USERPROFILE%\.gemini\antigravity-cli\conversations` (+ `conversation_summaries.db`); `%USERPROFILE%\.gemini\antigravity\` (**still active**, not merely legacy); IDE DB `%APPDATA%\Antigravity IDE\User\globalStorage\state.vscdb`; desktop `%APPDATA%\antigravity\`.
+- Do **not** rely on `~\.gemini\antigravity-ide\conversations` (may be migrated away).
 - Populate `tasks[]` only with high confidence; otherwise leave empty.
 
 **Hardening:** Any collector failure sets `status`/`ok: false`, safe `error`/`error_code`, empty limits/tasks for that provider; never crash the whole aggregate.
