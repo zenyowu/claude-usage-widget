@@ -1,0 +1,29 @@
+# Copy to %USERPROFILE%\.agent-status\config.toml (install.ps1 writes a real one).
+host = "home-pc"
+port = 8787
+stale_after_seconds = 1200
+aggregate_interval_seconds = 300
+notify_interval_seconds = 300
+antigravity_min_interval_seconds = 900
+
+[cursor]
+enabled = true
+
+[antigravity]
+enabled = true
+agy_path = ""  # install fills absolute path when found
+
+[ntfy]
+base_url = "https://ntfy.sh"
+topic = ""     # install-generated unguessable topic — required
+token = ""     # publish token — required (free ntfy.sh has no ACL)
+
+[alerts]
+quota_warn = 80
+quota_crit = 95
+source_fail_streak = 3
+cooldown_minutes = 45
+
+[tunnel]
+# Prefer: cloudflared service install (not supervised by watchdog)
+mode = "service"

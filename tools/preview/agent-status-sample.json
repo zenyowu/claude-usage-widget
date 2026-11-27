@@ -1,0 +1,124 @@
+{
+  "generated": "2026-11-27T19:00:00+08:00",
+  "stale_after_seconds": 1200,
+  "host": "home-pc",
+  "schema_version": 2,
+  "generator_version": "2026.11.27.7",
+  "providers": {
+    "cursor": {
+      "id": "cursor",
+      "label": "Cursor",
+      "status": "ok",
+      "ok": true,
+      "error": null,
+      "error_code": null,
+      "collected_at": "2026-11-27T19:00:00+08:00",
+      "last_success_at": "2026-11-27T19:00:00+08:00",
+      "limits": [
+        {
+          "id": "cursor:plan",
+          "label": "本週期方案",
+          "percent": 42,
+          "used": 84,
+          "limit": 200,
+          "unit": "usd",
+          "unit_raw": "usd",
+          "window": "billing_cycle",
+          "quality": "exact",
+          "resets": "2026-12-27T00:00:00+08:00",
+          "group": null,
+          "source": "api",
+          "at": "2026-11-27T19:00:00+08:00"
+        }
+      ],
+      "today": null,
+      "last30": null,
+      "meta": { "membership_type": "premium" }
+    },
+    "antigravity": {
+      "id": "antigravity",
+      "label": "Antigravity",
+      "status": "ok",
+      "ok": true,
+      "error": null,
+      "error_code": null,
+      "collected_at": "2026-11-27T19:00:00+08:00",
+      "last_success_at": "2026-11-27T19:00:00+08:00",
+      "limits": [
+        {
+          "id": "antigravity:gemini-weekly",
+          "label": "Gemini 每週",
+          "percent": 2,
+          "used": null,
+          "limit": null,
+          "unit": "percent",
+          "unit_raw": null,
+          "window": "weekly",
+          "quality": "exact",
+          "resets": "2026-12-03T16:12:34+08:00",
+          "group": "Gemini Models",
+          "source": "cli",
+          "at": "2026-11-27T19:00:00+08:00"
+        },
+        {
+          "id": "antigravity:gemini-5h",
+          "label": "Gemini 5 小時",
+          "percent": 3,
+          "used": null,
+          "limit": null,
+          "unit": "percent",
+          "unit_raw": null,
+          "window": "5h",
+          "quality": "exact",
+          "resets": "2026-11-27T22:36:53+08:00",
+          "group": "Gemini Models",
+          "source": "cli",
+          "at": "2026-11-27T19:00:00+08:00"
+        },
+        {
+          "id": "antigravity:3p-weekly",
+          "label": "Claude／GPT 每週",
+          "percent": 0,
+          "used": null,
+          "limit": null,
+          "unit": "percent",
+          "unit_raw": null,
+          "window": "weekly",
+          "quality": "exact",
+          "resets": null,
+          "group": "Claude and GPT models",
+          "source": "cli",
+          "at": "2026-11-27T19:00:00+08:00"
+        },
+        {
+          "id": "antigravity:3p-5h",
+          "label": "Claude／GPT 5 小時",
+          "percent": 0,
+          "used": null,
+          "limit": null,
+          "unit": "percent",
+          "unit_raw": null,
+          "window": "5h",
+          "quality": "exact",
+          "resets": null,
+          "group": "Claude and GPT models",
+          "source": "cli",
+          "at": "2026-11-27T19:00:00+08:00"
+        }
+      ],
+      "today": null,
+      "last30": null,
+      "meta": {}
+    }
+  },
+  "tasks": [
+    {
+      "id": "cursor:composer:sample",
+      "provider": "cursor",
+      "title": "範例：等待核准的任務",
+      "state": "waiting_user",
+      "since": "2026-11-27T18:50:00+08:00",
+      "updated_at": "2026-11-27T18:55:00+08:00"
+    }
+  ]
+}

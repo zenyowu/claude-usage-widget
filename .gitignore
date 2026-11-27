@@ -3,3 +3,7 @@ tools/preview/w.js
 tools/preview/claude-usage.json
 *.log
 __pycache__/
+win/node_modules/
+tools/_spike_*.mjs
+.agent-status/
+*.token

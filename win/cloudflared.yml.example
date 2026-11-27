@@ -1,0 +1,10 @@
+# Named Tunnel example — replace TUNNEL_UUID and hostname.
+# Prefer: cloudflared service install (Windows service), not watchdog-spawned.
+# Ingress only to localhost; keep /healthz local-only if your CF Access/WAF allows path rules.
+tunnel: TUNNEL_UUID
+credentials-file: C:\Users\YOU\.cloudflared\TUNNEL_UUID.json
+
+ingress:
+  - hostname: agent-status.example.com
+    service: http://127.0.0.1:8787
+  - service: http_status:404
