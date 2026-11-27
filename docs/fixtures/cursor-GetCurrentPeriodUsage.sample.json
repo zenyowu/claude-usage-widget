@@ -1,0 +1,29 @@
+{
+  "_fixture_note": "Structural sample of POST api2.cursor.sh/aiserver.v1.DashboardService/GetCurrentPeriodUsage. Live capture on this Windows host (2026-11-27) failed: ItemTable cursorAuth/accessToken is present but cursor.storage.authTokenEncryptionAtRest=true and the Bearer call returned ERROR_NOT_LOGGED_IN. Shape sourced from public PaceBar/community docs; monetary values are illustrative cents, not this account.",
+  "billingCycleStart": "1732665600000",
+  "billingCycleEnd": "1735257600000",
+  "planUsage": {
+    "totalSpend": 8400,
+    "includedSpend": 8400,
+    "bonusSpend": 0,
+    "remaining": 11600,
+    "limit": 20000,
+    "remainingBonus": false,
+    "bonusTooltip": "We work with model providers to give you free usage beyond what you've purchased. Amounts may vary.",
+    "autoPercentUsed": 12.5,
+    "apiPercentUsed": 30.0,
+    "totalPercentUsed": 42.0
+  },
+  "spendLimitUsage": {
+    "totalSpend": 0,
+    "individualLimit": 0,
+    "individualUsed": 0,
+    "individualRemaining": 0,
+    "limitType": "user"
+  },
+  "displayThreshold": 200,
+  "enabled": true,
+  "displayMessage": "You've used 42% of your usage limit",
+  "autoModelSelectedDisplayMessage": "You've used 13% of your included total usage",
+  "namedModelSelectedDisplayMessage": "You've used 30% of your included API usage"
+}
