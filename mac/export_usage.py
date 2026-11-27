@@ -399,6 +399,31 @@ if os.path.isdir(widget_dir):
     if os.path.exists(script_src) and not os.path.exists(script_dst):
         import shutil
         shutil.copyfile(script_src, script_dst)
+    # One copy per page, named "Claude Token 用量・<頁名>": in the widget's Script picker the user chooses the page
+    # instead of typing a Parameter. The copies follow the main script in iCloud (also after an in-app update),
+    # and are rewritten only when their content differs. USAGE_WIDGET_PAGE_SCRIPTS=0 turns this off.
+    if os.environ.get("USAGE_WIDGET_PAGE_SCRIPTS", "1") != "0":
+        main_code = None
+        for src in (script_dst, script_src):
+            try:
+                with open(src, encoding="utf-8") as f:
+                    main_code = f.read()
+                if "Script.setWidget" in main_code and "pageFromName" in main_code:
+                    break
+                main_code = None
+            except OSError:
+                pass
+        if main_code:
+            for page in ("趣味", "更多", "狀態", "寵物", "額度", "日曆", "洞察", "速度"):
+                copy = os.path.join(widget_dir, "Claude Token 用量・%s.js" % page)
+                try:
+                    with open(copy, encoding="utf-8") as f:
+                        if f.read() == main_code:
+                            continue
+                except OSError:
+                    pass
+                with open(copy, "w", encoding="utf-8") as f:
+                    f.write(main_code)
     today = now.date()
     def total(lo, hi):
         t = [0, 0, 0, 0, 0]

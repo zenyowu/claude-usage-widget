@@ -26,7 +26,7 @@ const C = {
 };
 
 // ---------- 設定（存在 iCloud 的 Scriptable 資料夾，App 與小工具共用；在 App 裡執行腳本即可修改） ----------
-const VERSION = "2026.11.27.4";
+const VERSION = "2026.11.27.5";
 const REPO = "zeuikli/claude-usage-widget";
 const SETTINGS_PATH = fm.joinPath(fm.documentsDirectory(), "claude-usage-settings.json");
 const STATE_PATH = fm.joinPath(fm.documentsDirectory(), "claude-usage-state.json");
@@ -1384,7 +1384,10 @@ async function selfUpdate() {
   r.timeoutInterval = 20;
   const code = await r.loadString();
   if (!code.includes("Script.setWidget") || !code.includes("const VERSION")) throw new Error("下載的內容不像這個小工具");
-  fm.writeString(module.filename, code);
+  // A page copy ("Claude Token 用量・速度") updates the main script; the Mac rewrites the copies from it.
+  const own = module.filename;
+  const target = fm.fileName(own).includes("・") ? fm.joinPath(fm.documentsDirectory(), MAIN_SCRIPT + ".js") : own;
+  fm.writeString(target, code);
 }
 
 // ---------- App 裡的設定頁 ----------
@@ -1466,6 +1469,14 @@ async function settingsPage(data) {
 
 // ---------- 主程式 ----------
 const PAGES = [["用量", usagePage], ["趣味", funPage], ["更多", morePage], ["狀態", statusPage], ["寵物", petPage], ["額度", limitsPage], ["日曆", calendarPage], ["洞察", insightPage], ["速度", speedPage]];
+// Page copies made by the Mac are named "Claude Token 用量・<頁名>", so they pick their page from their own name
+// and the Parameter field can stay empty. A typed Parameter still wins.
+const MAIN_SCRIPT = "Claude Token 用量";
+function pageFromName() {
+  const n = String(Script.name() || "");
+  const i = n.lastIndexOf("・");
+  return i >= 0 ? n.slice(i + 1) : "";
+}
 function pickPage(param) {
   const p = String(param || "").replace(/\s+/g, "").toLowerCase();
   if (p.includes("速度") || p.includes("speed")) return speedPage;
@@ -1556,7 +1567,7 @@ function build(page, data, family) {
 
 const data = await loadData();
 if (config.runsInWidget) {
-  Script.setWidget(build(pickPage(args.widgetParameter), data, config.widgetFamily || "large"));
+  Script.setWidget(build(pickPage(args.widgetParameter || pageFromName()), data, config.widgetFamily || "large"));
   try { await sideEffects(data); } catch (e) { console.log(e); }
 } else if (!config.runsInApp) {
   // Run from Shortcuts or Siri: no menu; loading the data above already refreshed the phone's cached copy.

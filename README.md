@@ -28,11 +28,11 @@ Claude 會：檢查環境 → 問你兩個選項（插電時是否保持清醒�
 
 1. 下載：`git clone https://github.com/zeuikli/claude-usage-widget`，或按 Code → Download ZIP 解壓縮。
 2. Mac：在資料夾裡依序執行 `bash doctor.sh --pre`、`bash install.sh`、`bash doctor.sh --wait`（全部 `[OK]` 就完成）。
-3. iPhone：安裝 Scriptable，加一個 Scriptable 小工具，Script 選「Claude Token 用量」，Parameter 填想看的頁面。
+3. iPhone：安裝 Scriptable，加一個 Scriptable 小工具，Script 直接選想看的頁面（例如「Claude Token 用量・速度」），Parameter 不用填。
 
 ## 會看到什麼
 
-小工具有九頁，用「參數」選頁（長按小工具 → 編輯小工具 → Parameter）。每頁都有小、中、大三種尺寸。
+小工具有九頁，在「編輯小工具」的 **Script** 清單直接選：「Claude Token 用量」是用量頁，其他頁是「Claude Token 用量・<頁名>」（Mac 會自動放好這 8 份頁面腳本，內容與主腳本相同，只是依名稱決定頁面）。也可以照舊用主腳本加 Parameter 填下表的參數，有填 Parameter 時以它為準。每頁都有小、中、大三種尺寸。不想要頁面腳本可在 LaunchAgent 加環境變數 `USAGE_WIDGET_PAGE_SCRIPTS=0`。
 
 | 參數 | 頁面 | 內容 |
 | --- | --- | --- |
@@ -209,7 +209,7 @@ launchctl kickstart -k gui/$(id -u)/claude-usage-widget.export
 
 1. 打開 Scriptable，等「Claude Token 用量」出現在腳本清單（iCloud 同步可能要一兩分鐘；如果安裝 Mac 端時還沒裝 Scriptable，背景匯出會在 5 分鐘內自動補上腳本）。點一下執行，可預覽每一頁。
 2. 長按主畫面空白處 → 左上「＋」→ 搜尋 Scriptable → 選尺寸 → 加入。
-3. 長按新的小工具 → 編輯小工具：Script 選「Claude Token 用量」，Parameter 填上表的參數（留空是用量頁）。
+3. 長按新的小工具 → 編輯小工具：Script 選想看的頁面——「Claude Token 用量」（用量）或「Claude Token 用量・速度」等，Parameter 留空。
 4. 想多頁，就加多個小工具，或疊成「智慧型堆疊」上下滑。
 
 選用：讓資料更常更新——「捷徑」→ 自動化 →「＋」→ App → 選常開的 App、勾「已關閉」、「立即執行」→
