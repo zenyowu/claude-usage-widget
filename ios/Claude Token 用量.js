@@ -26,7 +26,7 @@ const C = {
 };
 
 // ---------- 設定（存在 iCloud 的 Scriptable 資料夾，App 與小工具共用；在 App 裡執行腳本即可修改） ----------
-const VERSION = "2026.11.27.5";
+const VERSION = "2026.11.27.6";
 const REPO = "zeuikli/claude-usage-widget";
 const SETTINGS_PATH = fm.joinPath(fm.documentsDirectory(), "claude-usage-settings.json");
 const STATE_PATH = fm.joinPath(fm.documentsDirectory(), "claude-usage-state.json");
@@ -1417,12 +1417,28 @@ async function settingsPage(data) {
     const w = build(page, data, fam);
     if (fam === "accessoryRectangular") await w.presentAccessoryRectangular();
     else if (fam === "accessoryCircular") await w.presentAccessoryCircular();
+    else if (fam === "small") await w.presentSmall();
+    else if (fam === "medium") await w.presentMedium();
     else await w.presentLarge();
+  };
+  // One row per page: its name, then 小／中／大 buttons that open that size's preview.
+  const sizeRow = (name, page) => {
+    const r = new UITableRow();
+    r.height = 48;
+    const n = r.addText(name);
+    n.widthWeight = 40;
+    [["小", "small"], ["中", "medium"], ["大", "large"]].forEach(([label, fam]) => {
+      const b = r.addButton(label);
+      b.widthWeight = 20;
+      b.centerAligned();
+      b.onTap = async () => { await preview(page, fam); render(); };
+    });
+    t.addRow(r);
   };
   function render() {
     t.removeAllRows();
-    header("預覽（大尺寸）");
-    PAGES.forEach(([name, page]) => action(name, null, () => preview(page, "large")));
+    header("預覽（點小／中／大）");
+    PAGES.forEach(([name, page]) => sizeRow(name, page));
     action("鎖定畫面・長方形", null, () => preview(usagePage, "accessoryRectangular"));
     action("鎖定畫面・圓形", null, () => preview(usagePage, "accessoryCircular"));
     header("通知");
