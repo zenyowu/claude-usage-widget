@@ -3,6 +3,14 @@
 > Language for user-facing UI/docs: Traditional Chinese (繁體中文).
 > Code identifiers, comments, JSON keys, commit messages: English.
 > This document is the single source of truth for implementation. Do not reopen product decisions unless a hard blocker appears.
+>
+> **Peer-review amendments (2026-11-27):** Three reviewers (Composer 2.5, Grok 4.6, Grok 4.7)
+> agreed: (1) live `tasks[]` is best-effort, not an MVP hard gate; (2) Antigravity quota via
+> `agy -p /usage --output-format json` with a version gate — never drive the TUI; (3) run a
+> Windows collector spike before productizing Tunnel/parsers; (4) named Cloudflare Tunnel is
+> the production path; (5) ntfy ACL + high-entropy topic are mandatory; (6) `limits[].percent`
+> means **used** 0–100; add `stale_after_seconds`; prefer per-provider `collected_at`; keep
+> notify fingerprints off the public JSON when possible.
 
 ---
 
@@ -39,11 +47,12 @@ Open defaults if still unset by human:
 | Item | Default |
 | --- | --- |
 | Widget title | `Agent 狀態` |
-| ntfy | `https://ntfy.sh` + random topic + publish token |
-| CF hostname | Prefer named tunnel if domain exists; else Quick Tunnel for smoke test |
-| Refresh | Aggregate every **5 min**; notify check every **1 min** |
-| Machines | Single Windows PC |
-| Scriptable pages | Overview / Tasks / Cursor detail / Antigravity detail |
+| ntfy | `https://ntfy.sh` + **unguableable topic** + **required** publish token (subscribe ACL on phone) |
+| CF hostname | **Named Tunnel required for install**; Quick Tunnel = smoke test only |
+| Refresh | Aggregate every **5 min**; notify check every **1 min**; `stale_after_seconds: 1200` |
+| Machines | Single Windows PC (scheduler must run as the **logged-in user**, not SYSTEM) |
+| Scriptable pages | MVP may ship Overview first; Tasks / per-provider pages can follow |
+| Live tasks | **Best-effort**; empty `tasks[]` is a passing MVP |
 
 ---
 
@@ -57,7 +66,8 @@ Open defaults if still unset by human:
                              │         ├─► serve.py (127.0.0.1) ──Bearer──► cloudflared ──HTTPS──► iPhone Scriptable
                              │         └─► notify.py ──► ntfy ──► iPhone ntfy App
   token_mgmt.py (endpoint Bearer only)
-  Task Scheduler: aggregate@5m, notify@1m, serve+cloudflared KeepAlive
+  Prefer one watchdog process (serve + cloudflared) with timers for aggregate/notify;
+  if using Task Scheduler, jobs must share health checks (avoid four silent failures).
 ```
 
 ### Credential classes (do not confuse)
@@ -110,33 +120,18 @@ Top-level keys (stable):
 ```json
 {
   "generated": "2026-11-27T10:00:00+08:00",
+  "stale_after_seconds": 1200,
   "host": "TW_ZY_26",
   "schema_version": 1,
   "providers": {
     "cursor": { "...": "see below" },
     "antigravity": { "...": "see below" }
   },
-  "tasks": [
-    {
-      "id": "stable-id",
-      "provider": "cursor",
-      "title": "…",
-      "state": "waiting_approval",
-      "ask": "optional short question",
-      "updated_at": "2026-11-27T09:59:00+08:00"
-    }
-  ],
-  "alerts_hint": [
-    {
-      "fingerprint": "cursor:waiting:abc",
-      "severity": "high",
-      "title": "Cursor：有任務等你核准",
-      "body": "短摘要",
-      "kind": "waiting_approval"
-    }
-  ]
+  "tasks": []
 }
 ```
+
+> Notify fingerprints live in Windows `notify.py` state — **do not** put `alerts_hint` on the public `/status.json` endpoint (peer-review consensus). Truncate or omit `tasks[].ask` on the wire.
 
 ### Provider block
 
@@ -144,12 +139,19 @@ Top-level keys (stable):
 {
   "id": "cursor",
   "label": "Cursor",
+  "status": "ok",
   "ok": true,
   "error": null,
+  "error_code": null,
+  "collected_at": "2026-11-27T10:00:00+08:00",
   "limits": [
     {
+      "id": "cursor:plan",
       "label": "本週期方案",
       "percent": 42,
+      "unit": "percent",
+      "window": "billing_cycle",
+      "quality": "exact",
       "resets": "2026-12-01T00:00:00+08:00",
       "resets_text": "12/1",
       "source": "api",
@@ -162,15 +164,17 @@ Top-level keys (stable):
 }
 ```
 
-### `tasks[].state` enum
+**`limits[].percent` = used 0–100** (never “remaining”). Antigravity may emit multiple rows (e.g. Gemini 5h / weekly, partner-model 5h / weekly) with distinct `id` values.
 
-`running` | `waiting_user` | `waiting_approval` | `unread` | `failed`
+`status`: `ok` | `missing` | `signed_out` | `error` (keep boolean `ok` for simple clients).
 
-Omit idle tasks from the array.
+### `tasks[].state` enum (best-effort)
+
+Prefer only states you can defend: `running` | `failed` | optional `waiting_user` / `waiting_approval` when confidently mapped. Omit uncertain rows. Do **not** hard-require `unread`.
 
 ### Staleness rule (Scriptable)
 
-If `now - generated > 15–20 minutes` → show 「可能睡著／離線」 (do not pretend live).
+Use top-level `stale_after_seconds` (default **1200**). If `now - generated` exceeds it → 「可能睡著／離線」. Prefer also checking each provider’s `collected_at` so one failed collector does not stale the other.
 
 ---
 
@@ -180,7 +184,7 @@ If `now - generated > 15–20 minutes` → show 「可能睡著／離線」 (do 
 
 **Limits (authoritative for billing %):**
 
-1. Open `%APPDATA%\Cursor\User\globalStorage\state.vscdb` SQLite **read-only** (`mode=ro`, fallback `immutable=1`).
+1. Prefer **copy** `state.vscdb` (+ `-wal`/`-shm` if present) to a temp dir, then open SQLite read-only (live WAL + `immutable=1` can miss the current access token).
 2. Read Cursor auth access token from ItemTable / cursorDiskKV (`cursorAuth/accessToken` or current equivalent). Never print it.
 3. `POST https://api2.cursor.sh/aiserver.v1.DashboardService/GetCurrentPeriodUsage`  
    Headers: `Authorization: Bearer <token>`, `Content-Type: application/json`, `Connect-Protocol-Version: 1`  
@@ -199,17 +203,21 @@ If `now - generated > 15–20 minutes` → show 「可能睡著／離線」 (do 
 
 ### 5.2 Antigravity (`win/collectors/antigravity.py`)
 
-**Limits:**
+**Limits (scriptable path — peer-reviewed):**
 
-- Prefer Antigravity CLI `/usage` or `/quota` (or documented equivalent) using the already-logged-in CLI on PATH (`agy` / antigravity). Parse 5h / weekly style quotas into `limits[]`.
-- Never scrape passwords; use CLI session only.
+- Binary: `%LOCALAPPDATA%\agy\bin\agy.exe` (or `Get-Command agy`).
+- **Require** a minimum CLI version that supports print-mode slash commands (community: **≥ 1.1.11**). Below that → `status: missing` / `unsupported_agy_version`, do not run.
+- Headless: `agy -p /usage --output-format json` (alias `/quota`). **Never** drive the interactive TUI from Task Scheduler.
+- Reject responses that look like a real agent turn (e.g. non-zero model turns) — older CLIs can burn quota if slash commands are disabled.
+- Parse groups into multiple `limits[]` rows (`window`: `5h` | `weekly`; separate model pools). Convert remaining fractions → **used** `percent`.
+- Settings / auth (do not log): `%USERPROFILE%\.gemini\antigravity-cli\`; Windows Credential Manager service `gemini` / account `antigravity` (version-dependent).
 
-**Activity / live tasks:**
+**Activity / live tasks (experimental):**
 
-- Use local Antigravity session/state paths on Windows as discovered by doctor probe.
-- Populate `tasks[]` when an interaction is running or waiting on the user.
+- Probe paths: `%USERPROFILE%\.gemini\antigravity-cli\conversations`, `antigravity-ide\conversations`, legacy `antigravity\`; IDE DB `%APPDATA%\Antigravity IDE\User\globalStorage\state.vscdb`.
+- Populate `tasks[]` only with high confidence; otherwise leave empty.
 
-**Hardening:** Any collector failure sets `ok: false`, `error: "<safe message>"`, empty limits/tasks for that provider; never crash the whole aggregate.
+**Hardening:** Any collector failure sets `status`/`ok: false`, safe `error`/`error_code`, empty limits/tasks for that provider; never crash the whole aggregate.
 
 ---
 
@@ -248,8 +256,8 @@ If `now - generated > 15–20 minutes` → show 「可能睡著／離線」 (do 
 ```toml
 [ntfy]
 base_url = "https://ntfy.sh"
-topic = "<random>"          # install-generated, unguessable
-token = "<optional publish token>"
+topic = "<random>"          # install-generated, unguessable — required
+token = "<required publish token>"
 
 [alerts]
 quota_warn = 80
@@ -266,7 +274,7 @@ cooldown_minutes = 45
 | any limit percent ≥ 80 | default | `Cursor：本週期已用 82%` |
 | task `failed` | urgent | `Cursor：任務失敗` |
 
-Dedup by `fingerprint` + cooldown. Optional single 「恢復」 notification when condition clears.
+Dedup by `fingerprint` + cooldown (state file on disk, not public JSON). Optional single 「恢復」 notification when condition clears. Prefer short titles like 「有任務等你核准」 — do not push raw `ask` / prompt fragments.
 
 **Never** include endpoint Bearer, provider tokens, or full prompts in ntfy payloads.
 
@@ -325,10 +333,13 @@ Exit code 0 iff no `[!!]`.
 
 | ID | Deliverable | Acceptance |
 | --- | --- | --- |
-| **M0** | Schema + `tools/preview/sample.json` + Scriptable skeleton (繁中) | Preview renders fake Cursor+Antigravity data |
-| **M1** | `serve` + Bearer + token rotate + CF Tunnel wiring | doctor dual probe 401/200; phone or curl via tunnel with Bearer works |
-| **M2** | Real Cursor + Antigravity collectors + aggregate + schedule | Overview shows two live limit rows; staleness works when PC sleeps |
-| **M3** | `tasks[]` + ntfy rules | Waiting task → ntfy on phone within ~1–2 min |
+| **M0** | Schema (amended) + `sample.json` + Scriptable skeleton (繁中) | Preview renders multi-limit bars + stale |
+| **M0.5** | Windows **collector spike** → `docs/SOURCES.md` + redacted fixtures | Cursor API JSON and/or `agy -p /usage` captured; gate before parsers |
+| **M1** | `serve` + Bearer + rotate + **named** Tunnel docs | doctor 401/200; Quick Tunnel only for smoke |
+| **M2a** | Cursor limits collector + aggregate schedule + stale UI | Overview shows Cursor bar after sleep test |
+| **M2b** | Antigravity limits (multi-window); degrade per-provider | Failure does not blank Cursor |
+| **M3a** | ntfy **quota** 80/95 (+ recover) with mandatory ACL | Phone gets quota alert; no task dependency |
+| **M3b** | Optional `tasks[]` + waiting notify | Empty tasks still ships; notify only on confident `needs_user` |
 | **M4** | Codex + Claude collectors | Four providers on overview |
 | **M5** | Polish install/doctor/README; optional CF Access | Clean machine install from docs |
 
@@ -340,8 +351,10 @@ Exit code 0 iff no `[!!]`.
 - [ ] serve bound to localhost only  
 - [ ] Bearer required for `/status.json`  
 - [ ] Token rotate documented  
-- [ ] ntfy topic unguessable  
+- [ ] ntfy topic unguessable **and** publish token required  
+- [ ] 401 rate-limiting on `/status.json`  
 - [ ] Logs redact Authorization headers and tokens  
+- [ ] Public JSON omits or truncates sensitive `ask` / long titles  
 - [ ] doctor never prints secret values  
 
 ---
