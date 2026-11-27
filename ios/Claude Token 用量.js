@@ -26,7 +26,7 @@ const C = {
 };
 
 // ---------- 設定（存在 iCloud 的 Scriptable 資料夾，App 與小工具共用；在 App 裡執行腳本即可修改） ----------
-const VERSION = "2026.11.27.3";
+const VERSION = "2026.11.27.4";
 const REPO = "zeuikli/claude-usage-widget";
 const SETTINGS_PATH = fm.joinPath(fm.documentsDirectory(), "claude-usage-settings.json");
 const STATE_PATH = fm.joinPath(fm.documentsDirectory(), "claude-usage-state.json");
@@ -1510,8 +1510,11 @@ async function loadData() {
 
 // Ask iOS to refresh in 5 minutes, or 30 s after the next limit resets if that comes sooner,
 // so a reset shows up as 0% without waiting. iOS treats this as a hint and may come later.
+// If the copy iCloud handed us is already old (the phone had not downloaded the Mac's newer file yet),
+// the download has just been requested, so ask iOS to come back in 2 minutes instead of 5.
 function nextRefresh(data) {
-  let t = Date.now() + 5 * 60 * 1000;
+  const stale = data && data.generated && Date.now() - new Date(data.generated).getTime() > 10 * 60 * 1000;
+  let t = Date.now() + (stale ? 2 : 5) * 60 * 1000;
   ((data && data.limits) || []).forEach(x => {
     const r = x.resets ? new Date(x.resets).getTime() + 30000 : 0;
     if (r > Date.now() && r < t) t = r;
